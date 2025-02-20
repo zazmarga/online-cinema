@@ -1,12 +1,25 @@
 import enum
-from datetime import datetime
-from typing import List
+from datetime import datetime, timezone, timedelta
+from typing import List, Optional
 
-from database import Base
 
-from sqlalchemy import Integer, Enum, String, Boolean, func, DateTime, ForeignKey
+from sqlalchemy import (
+    Integer,
+    Enum,
+    String,
+    Boolean,
+    func,
+    DateTime,
+    ForeignKey,
+    UniqueConstraint,
+)
 
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
+
+from src.database.models.base import Base
+from src.database.validators.accounts import validate_password_strength, validate_email
+from src.security.passwords import hash_password, verify_password
+from src.security.utils import generate_secure_token
 
 
 class UserGroupEnum(str, enum.Enum):
@@ -56,3 +69,83 @@ class UserModel(Base):
     group: Mapped["UserGroupModel"] = relationship(
         "UserGroupModel", back_populates="users"
     )
+    activation_token: Mapped[Optional["ActivationTokenModel"]] = relationship(
+        "ActivationTokenModel", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    def __repr__(self):
+        return (
+            f"<UserModel(id={self.id}, email={self.email}, is_active={self.is_active})>"
+        )
+
+    def has_group(self, group_name: UserGroupEnum) -> bool:
+        return self.group.name == group_name
+
+    @classmethod
+    def create(
+        cls, email: str, raw_password: str, group_id: int | Mapped[int]
+    ) -> "UserModel":
+        """
+        Factory method to create a new UserModel instance.
+
+        This method simplifies the creation of a new user by handling
+        password hashing and setting required attributes.
+        """
+        user = cls(email=email, group_id=group_id)
+        user.password = raw_password
+        return user
+
+    @property
+    def password(self) -> None:
+        raise AttributeError(
+            "Password is write-only. Use the setter to set the password."
+        )
+
+    @password.setter
+    def password(self, raw_password: str) -> None:
+        """
+        Set the user's password after validating its strength and hashing it.
+        """
+        validate_password_strength(raw_password)
+        self._hashed_password = hash_password(raw_password)
+
+    def verify_password(self, raw_password: str) -> bool:
+        """
+        Verify the provided password against the stored hashed password.
+        """
+        return verify_password(raw_password, self._hashed_password)
+
+    @validates("email")
+    def validate_email(self, key, value):
+        return validate_email(value.lower())
+
+
+class TokenBaseModel(Base):
+    __abstract__ = True
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    token: Mapped[str] = mapped_column(
+        String(64), unique=True, nullable=False, default=generate_secure_token
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc) + timedelta(days=1),
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+
+
+class ActivationTokenModel(TokenBaseModel):
+    __tablename__ = "activation_tokens"
+
+    user: Mapped[UserModel] = relationship(
+        "UserModel", back_populates="activation_token"
+    )
+
+    __table_args__ = (UniqueConstraint("user_id"),)
+
+    def __repr__(self):
+        return f"<ActivationTokenModel(id={self.id}, token={self.token}, expires_at={self.expires_at})>"
