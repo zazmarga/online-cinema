@@ -28,9 +28,7 @@ class UserRegistrationResponseSchema(BaseModel):
     id: int
     email: EmailStr
 
-    model_config = {
-        "from_attributes": True
-    }
+    model_config = {"from_attributes": True}
 
 
 class MessageResponseSchema(BaseModel):
@@ -40,3 +38,16 @@ class MessageResponseSchema(BaseModel):
 class UserActivationRequestSchema(BaseModel):
     email: EmailStr
     token: str
+
+
+class UserActivationRestoreResponseSchema(BaseModel):
+    id: int
+    email: EmailStr
+
+    model_config = {"from_attributes": True}
+
+
+class UserActivationRestoreRequestSchema(BaseModel):
+    email: EmailStr
+
+    model_config = {"from_attributes": True}

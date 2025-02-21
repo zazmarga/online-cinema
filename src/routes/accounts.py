@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import cast
+from typing import cast, Type
 
 from fastapi import APIRouter, status, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.exc import SQLAlchemyError
@@ -20,6 +20,8 @@ from src.schemas.accounts import (
     UserRegistrationRequestSchema,
     MessageResponseSchema,
     UserActivationRequestSchema,
+    UserActivationRestoreResponseSchema,
+    UserActivationRestoreRequestSchema,
 )
 
 router = APIRouter()
@@ -30,7 +32,7 @@ router = APIRouter()
     response_model=UserRegistrationResponseSchema,
     summary="User Registration",
     description="Register a new user with an email and password.",
-    status_code=201,
+    status_code=status.HTTP_201_CREATED,
     responses={
         409: {
             "description": "Conflict - User with this email already exists.",
@@ -181,3 +183,98 @@ def activate_account(
     )
 
     return MessageResponseSchema(message="User account activated successfully.")
+
+
+@router.post(
+    "/activation-restore/",
+    response_model=UserActivationRestoreResponseSchema,
+    summary="Restore Activation Token",
+    description="Restore an activation token of new user if your activation token is expired.",
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {
+            "description": "Bad Request - User with this email does not exist"
+            "or the user account is already active.",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "invalid_email": {
+                            "summary": "Invalid Email",
+                            "value": {"detail": "User with this email does not exist."},
+                        },
+                        "already_active": {
+                            "summary": "Account Already Active",
+                            "value": {"detail": "User account is already active."},
+                        },
+                        "token_still_valid": {
+                            "summary": "Activation Token Is Still Valid",
+                            "value": {
+                                "detail": "User's activation token is still valid."
+                            },
+                        },
+                    }
+                }
+            },
+        },
+    },
+)
+def restore_activation_token(
+    restore_data: UserActivationRestoreRequestSchema,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    email_sender: EmailSenderInterface = Depends(get_accounts_email_notificator),
+) -> UserActivationRestoreResponseSchema:
+    user = db.query(UserModel).filter_by(email=restore_data.email).first()
+    if not user:
+        raise HTTPException(
+            status_code=400,
+            detail=f"A user with this email {restore_data.email} does not exist.",
+        )
+
+    if user.is_active:
+        raise HTTPException(
+            status_code=400,
+            detail="User account is already active.",
+        )
+
+    token = (
+        db.query(ActivationTokenModel)
+        .join(UserModel)
+        .filter(
+            UserModel.email == restore_data.email,
+            ActivationTokenModel.user_id == user.id,
+        )
+        .first()
+    )
+    if token:
+        if cast(datetime, token.expires_at).replace(tzinfo=timezone.utc) < datetime.now(
+            timezone.utc
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="User's activation token is still valid.",
+            )
+        db.delete(token)
+        db.flush()
+
+    try:
+        activation_token = ActivationTokenModel(user_id=user.id)
+        db.add(activation_token)
+        db.commit()
+        db.refresh(user)
+
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred during user creation.",
+        )
+
+    else:
+
+        activation_link = "http://127.0.0.1/accounts/activate/"
+
+        background_tasks.add_task(
+            email_sender.send_activation_restore_email, user.email, activation_link
+        )
+
+        return UserActivationRestoreResponseSchema(id=user.id, email=user.email)
