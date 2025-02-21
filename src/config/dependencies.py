@@ -1,9 +1,9 @@
-import os
-
 from fastapi import Depends
 
 from src.config.settings import Settings, BaseAppSettings
 from src.notifications import EmailSenderInterface, EmailSender
+from src.security.interfaces import JWTAuthManagerInterface
+from src.security.token_manager import JWTAuthManager
 
 
 def get_settings() -> BaseAppSettings:
@@ -25,4 +25,14 @@ def get_accounts_email_notificator(
         activation_restore_email_template_name=settings.ACTIVATION_RESTORE_EMAIL_TEMPLATE_NAME,
         password_email_template_name=settings.PASSWORD_RESET_TEMPLATE_NAME,
         password_complete_email_template_name=settings.PASSWORD_RESET_COMPLETE_TEMPLATE_NAME,
+    )
+
+
+def get_jwt_auth_manager(
+    settings: BaseAppSettings = Depends(get_settings),
+) -> JWTAuthManagerInterface:
+    return JWTAuthManager(
+        secret_key_access=settings.SECRET_KEY_ACCESS,
+        secret_key_refresh=settings.SECRET_KEY_REFRESH,
+        algorithm=settings.JWT_SIGNING_ALGORITHM,
     )
