@@ -22,6 +22,7 @@ def get_accounts_email_notificator(
         template_dir=settings.PATH_TO_EMAIL_TEMPLATES_DIR,
         activation_email_template_name=settings.ACTIVATION_EMAIL_TEMPLATE_NAME,
         activation_complete_email_template_name=settings.ACTIVATION_COMPLETE_EMAIL_TEMPLATE_NAME,
+        activation_restore_email_template_name=settings.ACTIVATION_RESTORE_EMAIL_TEMPLATE_NAME,
         password_email_template_name=settings.PASSWORD_RESET_TEMPLATE_NAME,
         password_complete_email_template_name=settings.PASSWORD_RESET_COMPLETE_TEMPLATE_NAME,
     )

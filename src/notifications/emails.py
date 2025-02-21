@@ -20,6 +20,7 @@ class EmailSender(EmailSenderInterface):
         template_dir: str,
         activation_email_template_name: str,
         activation_complete_email_template_name: str,
+        activation_restore_email_template_name: str,
         password_email_template_name: str,
         password_complete_email_template_name: str,
     ):
@@ -31,6 +32,9 @@ class EmailSender(EmailSenderInterface):
         self._activation_email_template_name = activation_email_template_name
         self._activation_complete_email_template_name = (
             activation_complete_email_template_name
+        )
+        self._activation_restore_email_template_name = (
+            activation_restore_email_template_name
         )
         self._password_email_template_name = password_email_template_name
         self._password_complete_email_template_name = (
@@ -68,6 +72,13 @@ class EmailSender(EmailSenderInterface):
         html_content = template.render(email=email, login_link=login_link)
 
         subject = "Account Activated Successfully"
+        self._send_email(email, subject, html_content)
+
+    def send_activation_restore_email(self, email: str, activation_link: str) -> None:
+        template = self._env.get_template(self._activation_restore_email_template_name)
+        html_content = template.render(email=email, activation_link=activation_link)
+
+        subject = "Restore Activation"
         self._send_email(email, subject, html_content)
 
     def send_password_reset_email(self, email: str, reset_link: str) -> None:
