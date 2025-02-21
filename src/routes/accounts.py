@@ -30,7 +30,9 @@ from src.schemas.accounts import (
     UserActivationRestoreRequestSchema,
     UserLoginResponseSchema,
     UserLoginRequestSchema,
+    UserLogoutResponseSchema,
 )
+from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
 
 router = APIRouter()
@@ -375,3 +377,53 @@ def login_user(
         access_token=jwt_access_token,
         refresh_token=jwt_refresh_token,
     )
+
+
+@router.post(
+    "/logout/",
+    summary="User Logout",
+    description="Unauthenticate a user and delete user's refresh token.",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Authorization header is missing."}
+                }
+            },
+        },
+        500: {
+            "description": "Internal Server Error.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Authorization header is missing."}
+                }
+            },
+        },
+    },
+)
+def logout_user(
+    token: str = Depends(get_token),
+    db: Session = Depends(get_db),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+):
+    if token:
+        payload = jwt_manager.decode_access_token(token)
+        user_id = payload.get("user_id")
+    else:
+        raise HTTPException(status_code=500, detail="Authorization header is missing.")
+
+    if user_id:
+        user = db.query(UserModel).join(RefreshTokenModel).filter_by(id=user_id).first()
+        try:
+            user.is_active = False
+            for refresh_token in user.refresh_tokens:
+                db.delete(refresh_token)
+            db.commit()
+            db.refresh(user)
+            return
+        except AttributeError:
+            raise HTTPException(
+                status_code=500, detail="Authorization header is missing."
+            )
