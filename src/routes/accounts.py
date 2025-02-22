@@ -17,6 +17,7 @@ from src.database.models.accounts import (
     UserGroupEnum,
     ActivationTokenModel,
     RefreshTokenModel,
+    PasswordResetTokenModel,
 )
 from src.database.session import get_db
 from src.exceptions.security import BaseSecurityError
@@ -34,6 +35,7 @@ from src.schemas.accounts import (
     TokenRefreshResponseSchema,
     TokenRefreshRequestSchema,
     ChangePasswordRequestSchema,
+    PasswordResetRequestSchema,
 )
 from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
@@ -510,18 +512,23 @@ def refresh_access_token(
             "description": "Bad Request",
             "content": {
                 "application/json": {
-                    "examples": {
-                        "same_password": {
-                            "summary": "New Password Is The Same",
-                            "value": {
-                                "detail": "The new password cannot be the same as the current password."
-                            },
-                        },
-                        "invalid_password": {
-                            "summary": "Invalid Password",
-                            "value": {"detail": "The current password is incorrect."},
-                        },
+                    "example": {
+                        "detail": "The new password cannot be the same as the current."
                     }
+                }
+            },
+        },
+        401: {
+            "description": "Unauthorized - Invalid email or password.",
+            "content": {
+                "application/json": {"example": {"detail": "Invalid password."}}
+            },
+        },
+        403: {
+            "description": "Forbidden - User account is not activated.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "User account is not activated."}
                 }
             },
         },
@@ -552,7 +559,12 @@ def change_password(
     db: Session = Depends(get_db),
     jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
 ) -> MessageResponseSchema:
+    """
+    Endpoint for changing the current password to a new one.
 
+    If user exists and is active, then: if user knows his current password,
+    he can change it to a new one.
+    """
     if token:
         payload = jwt_manager.decode_access_token(token)
         user_id = payload.get("user_id")
@@ -562,18 +574,24 @@ def change_password(
     if change_data.current_password == change_data.new_password:
         raise HTTPException(
             status_code=400,
-            detail="The new password cannot be the same as the current password.",
+            detail="The new password cannot be the same as the current.",
         )
 
     if not verify_password(
         change_data.current_password, hash_password(change_data.current_password)
     ):
         raise HTTPException(
-            status_code=400,
-            detail="The current password is incorrect.",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid password.",
         )
 
     user = db.query(UserModel).filter_by(id=user_id).first()
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is not activated.",
+        )
+
     try:
         user.password = change_data.new_password
         db.commit()
@@ -586,4 +604,51 @@ def change_password(
             status_code=500,
             detail="An error occurred during user's password updating.",
         )
-.lambda
+
+
+@router.post(
+    "/password-reset/request/",
+    response_model=MessageResponseSchema,
+    summary="Request Password Reset Token",
+    description=(
+        "Allows a user to request a password reset token. If the user exists and is active, "
+        "a new token will be generated and any existing tokens will be invalidated."
+    ),
+    status_code=status.HTTP_200_OK,
+)
+def request_password_reset_token(
+    data: PasswordResetRequestSchema,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    email_sender: EmailSenderInterface = Depends(get_accounts_email_notificator),
+) -> MessageResponseSchema:
+    """
+    Endpoint to request a password reset token.
+
+    If the user exists and is active, invalidates any existing password reset tokens and generates a new one.
+    Always responds with a success message to avoid leaking user information.
+    """
+    user = db.query(UserModel).filter_by(email=data.email).first()
+
+    if not user or not user.is_active:
+        return MessageResponseSchema(
+            message="If you are registered, you will receive an email with instructions."
+        )
+
+    db.query(PasswordResetTokenModel).filter_by(user_id=user.id).delete()
+
+    reset_token = PasswordResetTokenModel(user_id=cast(int, user.id))
+    db.add(reset_token)
+    db.commit()
+
+    password_reset_complete_link = "http://127.0.0.1/accounts/password-reset-complete/"
+
+    background_tasks.add_task(
+        email_sender.send_password_reset_email,
+        str(data.email),
+        password_reset_complete_link,
+    )
+
+    return MessageResponseSchema(
+        message="If you are registered, you will receive an email with instructions."
+    )
