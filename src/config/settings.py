@@ -25,6 +25,9 @@ class BaseAppSettings(BaseSettings):
 
     LOGIN_TIME_DAYS: int = 7
 
+    CELERY_BROKER: str = os.getenv("CELERY_BROKER", "redis://localhost:6379/0")
+    CELERY_BACKEND: str = os.getenv("CELERY_BACKEND", "redis://localhost:6379/0")
+
 
 class Settings(BaseAppSettings):
     SECRET_KEY_ACCESS: str = os.getenv("SECRET_KEY_ACCESS", os.urandom(32).hex())
