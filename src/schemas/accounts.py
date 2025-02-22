@@ -61,3 +61,12 @@ class UserLoginResponseSchema(BaseModel):
 
 class UserLoginRequestSchema(BaseEmailPasswordSchema):
     pass
+
+
+class TokenRefreshResponseSchema(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class TokenRefreshRequestSchema(BaseModel):
+    refresh_token: str
