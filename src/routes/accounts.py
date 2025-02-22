@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import cast, Type
+from typing import cast
 
 from fastapi import APIRouter, status, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.exc import SQLAlchemyError
@@ -36,6 +36,7 @@ from src.schemas.accounts import (
     TokenRefreshRequestSchema,
     ChangePasswordRequestSchema,
     PasswordResetRequestSchema,
+    PasswordResetCompleteRequestSchema,
 )
 from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
@@ -241,6 +242,11 @@ def restore_activation_token(
     db: Session = Depends(get_db),
     email_sender: EmailSenderInterface = Depends(get_accounts_email_notificator),
 ) -> UserActivationRestoreResponseSchema:
+    """
+    The endpoint to restore an activation token.
+
+    Allow resending a new token if the old one expires.
+    """
     user = db.query(UserModel).filter_by(email=restore_data.email).first()
     if not user:
         raise HTTPException(
@@ -414,6 +420,11 @@ def logout_user(
     db: Session = Depends(get_db),
     jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
 ):
+    """
+    The endpoint to logout a user.
+
+    On logout, the refresh token is deleted, preventing further use.
+    """
     if token:
         payload = jwt_manager.decode_access_token(token)
         user_id = payload.get("user_id")
@@ -505,7 +516,7 @@ def refresh_access_token(
     "/change-password/",
     response_model=MessageResponseSchema,
     summary="Change User Password",
-    description="Save new user password using a valid old password.",
+    description="Allows the user to change the password if he knows his current password.",
     status_code=status.HTTP_200_OK,
     responses={
         400: {
@@ -652,3 +663,94 @@ def request_password_reset_token(
     return MessageResponseSchema(
         message="If you are registered, you will receive an email with instructions."
     )
+
+
+@router.post(
+    "/reset-password/complete/",
+    response_model=MessageResponseSchema,
+    summary="Reset User Password",
+    description="Reset a user's password if a valid token is provided.",
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {
+            "description": "Bad Request - The provided email or token is invalid, "
+            "the token has expired, or the user account is not active.",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "invalid_email_or_token": {
+                            "summary": "Invalid Email or Token",
+                            "value": {"detail": "Invalid email or token."},
+                        },
+                        "expired_token": {
+                            "summary": "Expired Token",
+                            "value": {"detail": "Invalid email or token."},
+                        },
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Internal Server Error - An error occurred while resetting the password.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "An error occurred while resetting the password."
+                    }
+                }
+            },
+        },
+    },
+)
+def reset_password(
+    data: PasswordResetCompleteRequestSchema,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    email_sender: EmailSenderInterface = Depends(get_accounts_email_notificator),
+) -> MessageResponseSchema:
+    """
+    Endpoint for resetting a user's password.
+
+    Validates the token and updates the user's password if the token is valid and not expired.
+    Deletes the token after successful password reset.
+    """
+    user = db.query(UserModel).filter_by(email=data.email).first()
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email or token."
+        )
+
+    token_record = db.query(PasswordResetTokenModel).filter_by(user_id=user.id).first()
+
+    expires_at = cast(datetime, token_record.expires_at).replace(tzinfo=timezone.utc)
+
+    if (
+        not token_record
+        or token_record.token != data.token
+        or expires_at < datetime.now(timezone.utc)
+    ):
+        if token_record:
+            db.delete(token_record)
+            db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email or token."
+        )
+
+    try:
+        user.password = data.password
+        db.delete(token_record)
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while resetting the password.",
+        )
+
+    login_link = "http://127.0.0.1/accounts/login/"
+
+    background_tasks.add_task(
+        email_sender.send_password_reset_complete_email, str(data.email), login_link
+    )
+
+    return MessageResponseSchema(message="Password reset successfully.")
