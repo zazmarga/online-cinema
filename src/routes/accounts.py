@@ -33,9 +33,11 @@ from src.schemas.accounts import (
     UserLoginRequestSchema,
     TokenRefreshResponseSchema,
     TokenRefreshRequestSchema,
+    ChangePasswordRequestSchema,
 )
 from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
+from src.security.passwords import hash_password, verify_password
 
 router = APIRouter()
 
@@ -495,3 +497,93 @@ def refresh_access_token(
     new_access_token = jwt_manager.create_access_token({"user_id": user_id})
 
     return TokenRefreshResponseSchema(access_token=new_access_token)
+
+
+@router.post(
+    "/change-password/",
+    response_model=MessageResponseSchema,
+    summary="Change User Password",
+    description="Save new user password using a valid old password.",
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {
+            "description": "Bad Request",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "same_password": {
+                            "summary": "New Password Is The Same",
+                            "value": {
+                                "detail": "The new password cannot be the same as the current password."
+                            },
+                        },
+                        "invalid_password": {
+                            "summary": "Invalid Password",
+                            "value": {"detail": "The current password is incorrect."},
+                        },
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Internal Server Error.",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "missing_token": {
+                            "summary": "Missing Token",
+                            "value": {"detail": "Authorization header is missing."},
+                        },
+                        "server_error": {
+                            "summary": "Internal Server Error",
+                            "value": {
+                                "detail": "An error occurred during user's password updating."
+                            },
+                        },
+                    }
+                }
+            },
+        },
+    },
+)
+def change_password(
+    change_data: ChangePasswordRequestSchema,
+    token: str = Depends(get_token),
+    db: Session = Depends(get_db),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+) -> MessageResponseSchema:
+
+    if token:
+        payload = jwt_manager.decode_access_token(token)
+        user_id = payload.get("user_id")
+    else:
+        raise HTTPException(status_code=500, detail="Authorization header is missing.")
+
+    if change_data.current_password == change_data.new_password:
+        raise HTTPException(
+            status_code=400,
+            detail="The new password cannot be the same as the current password.",
+        )
+
+    if not verify_password(
+        change_data.current_password, hash_password(change_data.current_password)
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="The current password is incorrect.",
+        )
+
+    user = db.query(UserModel).filter_by(id=user_id).first()
+    try:
+        user.password = change_data.new_password
+        db.commit()
+        db.refresh(user)
+
+        return MessageResponseSchema(message="Password changed successfully.")
+
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred during user's password updating.",
+        )
+.lambda
