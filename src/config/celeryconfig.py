@@ -3,9 +3,9 @@ from celery.schedules import crontab
 from src.config.settings import settings
 
 beat_schedule = {
-    "delete-expired-tokens-every-hour": {
+    "delete-expired-tokens-twice-a-day": {
         "task": "delete_expired_activation_tokens",
-        "schedule": crontab(hour="*/1"),  # every hour
+        "schedule": crontab(minute="0", hour="*/12"),  # every 12 hours (twice a day)
     },
 }
 

@@ -17,7 +17,11 @@ app.include_router(
 )
 
 
-@app.get("/add-task")
-async def add_task():
+@app.get("/delete-expired-activation-tokens/")
+async def activation_tokens_task():
+    """
+    Periodically delete expired activation tokens.
+    The task is executed twice a day, launched using Celery-beat schedule.
+    """
     task = celery_app.send_task("delete_expired_activation_tokens")
     return {"task_id": task.id}
