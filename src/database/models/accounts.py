@@ -76,9 +76,7 @@ class UserModel(Base):
         "RefreshTokenModel", back_populates="user", cascade="all, delete-orphan"
     )
     password_reset_token: Mapped[Optional["PasswordResetTokenModel"]] = relationship(
-        "PasswordResetTokenModel",
-        back_populates="user",
-        cascade="all, delete-orphan"
+        "PasswordResetTokenModel", back_populates="user", cascade="all, delete-orphan"
     )
 
     def __repr__(self):
@@ -88,6 +86,14 @@ class UserModel(Base):
 
     def has_group(self, group_name: UserGroupEnum) -> bool:
         return self.group.name == group_name
+
+    @property
+    def is_admin(self) -> bool:
+        return self.group.name == UserGroupEnum.ADMIN
+
+    @property
+    def is_moderator(self) -> bool:
+        return self.group.name == UserGroupEnum.MODERATOR
 
     @classmethod
     def create(
@@ -186,7 +192,9 @@ class RefreshTokenModel(TokenBaseModel):
 class PasswordResetTokenModel(TokenBaseModel):
     __tablename__ = "password_reset_tokens"
 
-    user: Mapped[UserModel] = relationship("UserModel", back_populates="password_reset_token")
+    user: Mapped[UserModel] = relationship(
+        "UserModel", back_populates="password_reset_token"
+    )
 
     __table_args__ = (UniqueConstraint("user_id"),)
 

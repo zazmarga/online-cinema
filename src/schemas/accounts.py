@@ -1,5 +1,8 @@
+from typing import Optional
+
 from pydantic import BaseModel, EmailStr, field_validator
 
+from src.database.models.accounts import UserGroupEnum
 from src.database.validators.accounts import validate_password_strength
 
 
@@ -88,3 +91,15 @@ class PasswordResetRequestSchema(BaseModel):
 
 class PasswordResetCompleteRequestSchema(BaseEmailPasswordSchema):
     token: str
+
+
+class UserUpdateRequestSchema(BaseModel):
+    group: Optional[UserGroupEnum] = None
+    is_active: Optional[bool] = None
+
+    @field_validator("group")
+    @classmethod
+    def validate_group(cls, value):
+        return value.lower()
+
+    model_config = {"from_attributes": True}

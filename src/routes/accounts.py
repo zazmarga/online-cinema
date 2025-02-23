@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from os.path import exists
 from typing import cast
 
 from fastapi import APIRouter, status, BackgroundTasks, Depends, HTTPException
@@ -37,6 +38,7 @@ from src.schemas.accounts import (
     ChangePasswordRequestSchema,
     PasswordResetRequestSchema,
     PasswordResetCompleteRequestSchema,
+    UserUpdateRequestSchema,
 )
 from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
@@ -754,3 +756,106 @@ def reset_password(
     )
 
     return MessageResponseSchema(message="Password reset successfully.")
+
+
+@router.patch(
+    "/update-user/{user_id}/",
+    response_model=MessageResponseSchema,
+    summary="Change User Group OR User Is_active Manually",
+    description="Change the user's group or is_active manually, allowed only by admins.",
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Authorization header is missing or Invalid token."
+                    }
+                }
+            },
+        },
+        403: {
+            "description": "Forbidden.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Forbidden, allowed only by admins."}
+                }
+            },
+        },
+        404: {
+            "description": "User not found.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "User with the given ID was not found."}
+                }
+            },
+        },
+        500: {
+            "description": "Internal Server Error.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "An error occurred while updating the user."}
+                }
+            },
+        },
+    },
+)
+def update_user(
+    user_id: int,
+    data: UserUpdateRequestSchema,
+    token: str = Depends(get_token),
+    db: Session = Depends(get_db),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+) -> MessageResponseSchema:
+    """
+    Endpoint for update user: change the user's group or change is_active manually.
+    Allowed only by admins.
+
+    Steps:
+    - Validate received user_id
+    - Validate current user access token.
+    - Check if the current user is ADMIN.
+    - Change the user's group or is_active manually.
+    """
+    user = db.query(UserModel).filter_by(id=user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User with the given ID was not found.",
+        )
+
+    try:
+        payload = jwt_manager.decode_access_token(token)
+        current_user_id = payload.get("user_id")
+    except BaseSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    current_user = db.query(UserModel).filter_by(id=current_user_id).first()
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden, allowed only by admins.",
+        )
+    try:
+        if data.group and data.group != user.group.name:
+            new_group = db.query(UserGroupModel).filter_by(name=data.group).first()
+            if not new_group:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Group with the given name was not found.",
+                )
+            user.group_id = new_group.id
+        if exists(data.is_active) and data.is_active != user.is_active:
+            user.is_active = data.is_active
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        return MessageResponseSchema(message="User updated successfully.")
+
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while updating the user.",
+        )
