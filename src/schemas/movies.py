@@ -6,11 +6,14 @@ from pydantic import BaseModel, Field, field_validator
 from src.schemas.examples.movies import (
     movie_item_schema_example,
     movie_list_response_schema_example,
+    genre_schema_example,
+    director_schema_example,
+    star_schema_example,
+    movie_detail_schema_example,
 )
 
 
 class MovieBaseSchema(BaseModel):
-    id: int
     uuid: str = Field(..., max_length=65)
     name: str = Field(..., max_length=255)
     year: int = Field(..., ge=1895)
@@ -32,8 +35,14 @@ class MovieBaseSchema(BaseModel):
         return value
 
 
-class MovieListItemSchema(MovieBaseSchema):
-    pass
+class MovieListItemSchema(BaseModel):
+    id: int
+    name: str
+    year: int
+    time: int
+    imdb: float
+    description: str
+    price: float
 
     model_config = {
         "from_attributes": True,
@@ -51,4 +60,46 @@ class MovieListResponseSchema(BaseModel):
     model_config = {
         "from_attributes": True,
         "json_schema_extra": {"examples": [movie_list_response_schema_example]},
+    }
+
+
+class GenreSchema(BaseModel):
+    id: int
+    name: str
+
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {"examples": [genre_schema_example]},
+    }
+
+
+class DirectorSchema(BaseModel):
+    id: int
+    name: str
+
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {"examples": [director_schema_example]},
+    }
+
+
+class StarSchema(BaseModel):
+    id: int
+    name: str
+
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {"examples": [star_schema_example]},
+    }
+
+
+class MovieDetailSchema(MovieBaseSchema):
+    id: int
+    directors: List[DirectorSchema]
+    stars: List[StarSchema]
+    genres: List[GenreSchema]
+
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {"examples": [movie_detail_schema_example]},
     }
