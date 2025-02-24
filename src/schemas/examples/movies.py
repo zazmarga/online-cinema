@@ -68,4 +68,10 @@ movie_update_schema_example = {
 
 movie_genres_update_schema_example = {"genres": ["Gangster", "Crime", "Drama"]}
 
-movie_directors_update_schema_example = {"directors": ["Lana Wachowski", "Lilly Wachowski"]}
+movie_directors_update_schema_example = {
+    "directors": ["Lana Wachowski", "Lilly Wachowski"]
+}
+
+movie_stars_update_schema_example = {
+    "stars": ["Marlon Brando", "Al Pacino", "James Caan"]
+}
