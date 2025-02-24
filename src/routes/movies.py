@@ -111,7 +111,7 @@ def get_movie_list(
 
 
 @router.get(
-    "/movies/{movie_id}/",
+    "/movie-detail/{movie_id}/",
     response_model=MovieDetailSchema,
     summary="Get movie details by ID",
     description=(

@@ -18,7 +18,7 @@ class MovieBaseSchema(BaseModel):
     name: str = Field(..., max_length=255)
     year: int = Field(..., ge=1895)
     time: int = Field(..., ge=0)
-    imdb: float = Field(..., ge=0)
+    imdb: float = Field(..., ge=0, le=10)
     votes: int = Field(..., ge=0)
     meta_score: Optional[float] = Field(None, ge=0, le=100)
     gross: Optional[float] = Field(None)
