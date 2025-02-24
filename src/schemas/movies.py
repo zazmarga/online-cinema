@@ -10,11 +10,12 @@ from src.schemas.examples.movies import (
     director_schema_example,
     star_schema_example,
     movie_detail_schema_example,
+    movie_create_schema_example,
 )
 
 
 class MovieBaseSchema(BaseModel):
-    uuid: str = Field(..., max_length=65)
+    uuid: str = Field(...)
     name: str = Field(..., max_length=255)
     year: int = Field(..., ge=1895)
     time: int = Field(..., ge=0)
@@ -29,8 +30,8 @@ class MovieBaseSchema(BaseModel):
     @field_validator("year")
     @classmethod
     def validate_date(cls, value):
-        current_year = datetime.now().year
-        if value.year > current_year + 1:
+        current_year = int(datetime.now().year)
+        if value > current_year + 1:
             raise ValueError(f"The 'year' cannot be greater than {current_year + 1}.")
         return value
 
@@ -103,3 +104,29 @@ class MovieDetailSchema(MovieBaseSchema):
         "from_attributes": True,
         "json_schema_extra": {"examples": [movie_detail_schema_example]},
     }
+
+
+class MovieCreateSchema(BaseModel):
+    name: str
+    year: int = Field(..., ge=1895)
+    time: int
+    imdb: float = Field(..., ge=0, le=10)
+    votes: int
+    meta_score: Optional[float] = Field(None, ge=0, le=100)
+    gross: Optional[float] = Field(None)
+    description: str
+    price: float = Field(..., gt=0)
+    certification: str
+    directors: List[str]
+    genres: List[str]
+    stars: List[str]
+
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {"examples": [movie_create_schema_example]},
+    }
+
+    @field_validator("directors", "genres", "stars", mode="before")
+    @classmethod
+    def normalize_list_fields(cls, value: List[str]) -> List[str]:
+        return [item.title() for item in value]

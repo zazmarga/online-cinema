@@ -34,3 +34,20 @@ movie_detail_schema_example = {
     "stars": [star_schema_example],
     "genres": [genre_schema_example],
 }
+
+movie_create_schema_example = {
+    "name": "The Godfather",
+    "year": 1972,
+    "time": 175,
+    "imdb": 9.2,
+    "votes": 73,
+    "meta_score": 99.0,  #  or None
+    "gross": 250_000_000,  #  or None
+    "price": 9.99,
+    "certification": "R18+",
+    "description": "The aging patriarch of an organized crime dynasty transfers control "
+    "of his clandestine empire to his reluctant son.",
+    "directors": ["Francis Ford Coppola"],
+    "genres": ["Gangster", "Crime", "Drama"],
+    "stars": ["Marlon Brando", "Al Pacino", "James Caan"],
+}

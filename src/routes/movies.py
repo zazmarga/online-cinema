@@ -1,15 +1,28 @@
+import uuid
+
 from fastapi import APIRouter, Query, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
-from src.database.models.movies import MovieModel
+from src.config.dependencies import get_jwt_auth_manager
+from src.database.models.accounts import UserGroupModel, UserModel, UserGroupEnum
+from src.database.models.movies import (
+    MovieModel,
+    CertificationModel,
+    GenreModel,
+    StarModel,
+    DirectorModel,
+)
 from src.database.session import get_db
+from src.exceptions.security import BaseSecurityError
 from src.schemas.movies import (
     MovieListResponseSchema,
     MovieListItemSchema,
     MovieDetailSchema,
+    MovieCreateSchema,
 )
 from src.security.http import get_token
-
+from src.security.interfaces import JWTAuthManagerInterface
 
 router = APIRouter()
 
@@ -95,12 +108,12 @@ def get_movie_list(
     response = MovieListResponseSchema(
         movies=movie_list,
         prev_page=(
-            f"/movies/movies-list?page={page - 1}&per_page={per_page}"
+            f"/movies/movies-list/?page={page - 1}&per_page={per_page}"
             if page > 1
             else None
         ),
         next_page=(
-            f"/movies/movies-list?page={page + 1}&per_page={per_page}"
+            f"/movies/movies-list/?page={page + 1}&per_page={per_page}"
             if page < total_pages
             else None
         ),
@@ -186,3 +199,167 @@ def get_movie_by_id(
         )
 
     return MovieDetailSchema.model_validate(movie)
+
+
+@router.post(
+    "/add-movie/",
+    response_model=MovieDetailSchema,
+    summary="Add a new movie",
+    description=(
+        "<h3>This endpoint allows users-MODERATOR & users-ADMIN to add a new movie to the database. "
+        "It accepts details such as name, year, genres, stars, directors, and "
+        "other attributes. The associated certification, genres, stars, and directors "
+        "will be created or linked automatically.</h3>"
+    ),
+    responses={
+        201: {
+            "description": "Movie created successfully.",
+        },
+        400: {
+            "description": "Invalid input.",
+            "content": {
+                "application/json": {"example": {"detail": "Invalid input data."}}
+            },
+        },
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {"example": {"detail": "User unauthorized."}}
+            },
+        },
+        403: {
+            "description": "Forbidden.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "You don't have permission to do this operation."
+                    }
+                }
+            },
+        },
+    },
+    status_code=201,
+)
+def create_movie(
+    movie_data: MovieCreateSchema,
+    db: Session = Depends(get_db),
+    token: str = Depends(get_token),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+) -> MovieDetailSchema:
+    """
+    Add a new movie to the database.
+
+    This endpoint allows the creation of a new movie with details such as
+    name, year, time, genres, stars, and directors. It automatically
+    handles linking or creating related entities.
+    Allowed only for ADMIN & MODERATOR users.
+
+    :param movie_data: The data required to create a new movie.
+    :type movie_data: MovieCreateSchema
+    :param db: The SQLAlchemy database session (provided via dependency injection).
+    :type db: Session
+    :param token: The token used to authenticate.
+    :type token: str
+    :param jwt_manager: The JWT manager used to authenticate.
+    :type jwt_manager: JWTAuthManagerInterface
+
+    :return: The created movie with all details.
+    :rtype: MovieDetailSchema
+
+    :raises HTTPException: Raises a 400 error for invalid input.
+    """
+    try:
+        payload = jwt_manager.decode_access_token(token)
+        user_id = payload.get("user_id")
+    except BaseSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    user_group = (
+        db.query(UserGroupModel).join(UserModel).filter(UserModel.id == user_id).first()
+    )
+    if user_group == UserGroupEnum.USER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to do this operation.",
+        )
+
+    existing_movie = (
+        db.query(MovieModel)
+        .filter(
+            MovieModel.name == movie_data.name,
+            MovieModel.year == movie_data.year,
+            MovieModel.time == movie_data.time,
+        )
+        .first()
+    )
+
+    if existing_movie:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A movie with the name '{movie_data.name}', year: '{movie_data.year}', duration: '{movie_data.time}' already exists.",
+        )
+
+    try:
+        certification = (
+            db.query(CertificationModel)
+            .filter_by(name=movie_data.certification)
+            .first()
+        )
+        if not certification:
+            certification = CertificationModel(name=movie_data.certification)
+            db.add(certification)
+            db.flush()
+
+        genres = []
+        for genre_name in movie_data.genres:
+            genre = db.query(GenreModel).filter_by(name=genre_name).first()
+            if not genre:
+                genre = GenreModel(name=genre_name)
+                db.add(genre)
+                db.flush()
+            genres.append(genre)
+
+        stars = []
+        for star_name in movie_data.stars:
+            star = db.query(StarModel).filter_by(name=star_name).first()
+            if not star:
+                star = StarModel(name=star_name)
+                db.add(star)
+                db.flush()
+            stars.append(star)
+
+        directors = []
+        for director_name in movie_data.directors:
+            director = db.query(DirectorModel).filter_by(name=director_name).first()
+            if not director:
+                director = DirectorModel(name=director_name)
+                db.add(director)
+                db.flush()
+            directors.append(director)
+
+        movie = MovieModel(
+            uuid=str(uuid.uuid4()),
+            name=movie_data.name,
+            year=movie_data.year,
+            time=movie_data.time,
+            imdb=movie_data.imdb,
+            votes=movie_data.votes,
+            meta_score=movie_data.meta_score,
+            gross=movie_data.gross,
+            description=movie_data.description,
+            price=movie_data.price,
+            certification_id=certification.id,
+            directors=directors,
+            genres=genres,
+            stars=stars,
+        )
+
+        db.add(movie)
+        db.commit()
+        db.refresh(movie)
+
+        return MovieDetailSchema.model_validate(movie)
+    except IntegrityError as e:
+        print("ERROR: ", e)
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Invalid input data.")
