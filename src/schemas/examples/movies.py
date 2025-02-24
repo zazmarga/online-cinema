@@ -65,3 +65,7 @@ movie_update_schema_example = {
     "description": "The aging patriarch of an organized crime dynasty transfers control "
     "of his clandestine empire to his reluctant son.",
 }
+
+movie_genres_update_schema_example = {
+    "genres": ["Gangster", "Crime", "Drama"]
+}

@@ -21,6 +21,7 @@ from src.schemas.movies import (
     MovieDetailSchema,
     MovieCreateSchema,
     MovieUpdateSchema,
+    MovieGenresUpdateSchema,
 )
 from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
@@ -485,3 +486,121 @@ def update_movie(
         raise HTTPException(status_code=400, detail="Invalid input data.")
     else:
         return {"detail": "Movie updated successfully."}
+
+
+@router.post(
+    "/{movie_id}/update-genres/",
+    response_model=MovieDetailSchema,
+    status_code=status.HTTP_200_OK,
+    summary="Update genres of a movie by ID",
+    description=(
+        "<h3>Update genres of a specific movie by its unique ID.</h3>"
+        "<p>This endpoint updates genres of an existing movie. If the movie with "
+        "the given ID does not exist, a 404 error is returned."
+        "Allowed by only moderators & admins.</p>"
+    ),
+    responses={
+        200: {
+            "description": "Genres of movie updated successfully.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Genres of movie updated successfully."}
+                }
+            },
+        },
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {"example": {"detail": "User unauthorized."}}
+            },
+        },
+        403: {
+            "description": "Forbidden.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "You don't have permission to do this operation."
+                    }
+                }
+            },
+        },
+        404: {
+            "description": "Movie not found.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Movie with the given ID was not found."}
+                }
+            },
+        },
+    },
+)
+def update_movie_genres(
+    movie_id: int,
+    data: MovieGenresUpdateSchema,
+    db: Session = Depends(get_db),
+    token: str = Depends(get_token),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+):
+    """
+    Update genres of a specific movie by its ID.
+
+    This function updates genres of a movie identified by its unique ID.
+    If the movie does not exist, a 404 error is raised.
+    Allowed only by MODERATOR-users & ADMIN-users.
+
+    :param movie_id: The unique identifier of the movie to update.
+    :type movie_id: int
+    :param data: The updated data for genres of a movie.
+    :type data: MovieGenresUpdateSchema
+    :param db: The SQLAlchemy database session (provided via dependency injection).
+    :type db: Session
+    :param token: The token used to authenticate.
+    :type token: str
+    :param jwt_manager: The JWT manager used to authenticate.
+    :type jwt_manager: JWTAuthManagerInterface
+
+    :raises HTTPException: Raises a 404 error if the movie with the given ID is not found.
+
+    :return: A response indicating the successful update genres of the movie.
+    :rtype: None
+    """
+    try:
+        payload = jwt_manager.decode_access_token(token)
+        user_id = payload.get("user_id")
+    except BaseSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    user_group = (
+        db.query(UserGroupModel).join(UserModel).filter(UserModel.id == user_id).first()
+    )
+    if user_group == UserGroupEnum.USER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to do this operation.",
+        )
+
+    movie = db.query(MovieModel).filter(MovieModel.id == movie_id).first()
+    if not movie:
+        raise HTTPException(
+            status_code=404, detail="Movie with the given ID was not found."
+        )
+
+    try:
+        genres = []
+        for genre_name in data.genres:
+            genre = db.query(GenreModel).filter_by(name=genre_name).first()
+            if not genre:
+                genre = GenreModel(name=genre_name)
+                db.add(genre)
+                db.flush()
+            genres.append(genre)
+
+        movie.genres = genres
+        db.commit()
+        db.refresh(movie)
+
+        return movie
+
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Invalid input data.")
