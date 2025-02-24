@@ -51,3 +51,17 @@ movie_create_schema_example = {
     "genres": ["Gangster", "Crime", "Drama"],
     "stars": ["Marlon Brando", "Al Pacino", "James Caan"],
 }
+
+movie_update_schema_example = {
+    "name": "The Godfather",
+    "year": 1972,
+    "time": 175,
+    "imdb": 9.2,
+    "votes": 73,
+    "meta_score": 99.0,
+    "gross": 250_000_000,
+    "price": 9.99,
+    "certification": "R18+",
+    "description": "The aging patriarch of an organized crime dynasty transfers control "
+    "of his clandestine empire to his reluctant son.",
+}

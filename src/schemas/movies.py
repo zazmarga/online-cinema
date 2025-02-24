@@ -10,7 +10,7 @@ from src.schemas.examples.movies import (
     director_schema_example,
     star_schema_example,
     movie_detail_schema_example,
-    movie_create_schema_example,
+    movie_create_schema_example, movie_update_schema_example,
 )
 
 
@@ -130,3 +130,21 @@ class MovieCreateSchema(BaseModel):
     @classmethod
     def normalize_list_fields(cls, value: List[str]) -> List[str]:
         return [item.title() for item in value]
+
+
+class MovieUpdateSchema(BaseModel):
+    name: Optional[str] = None
+    year: Optional[int] = Field(None, ge=1895)
+    time: Optional[int] = None
+    imdb: Optional[float] = Field(None, ge=0, le=10)
+    votes: Optional[int] = None
+    meta_score: Optional[float] = Field(None, ge=0, le=100)
+    gross: Optional[float] = None
+    description: Optional[str] = None
+    price: Optional[float] = Field(None, gt=0)
+    certification: Optional[str] = None
+
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {"examples": [movie_update_schema_example]},
+    }

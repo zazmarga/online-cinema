@@ -20,6 +20,7 @@ from src.schemas.movies import (
     MovieListItemSchema,
     MovieDetailSchema,
     MovieCreateSchema,
+    MovieUpdateSchema,
 )
 from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
@@ -363,3 +364,124 @@ def create_movie(
         print("ERROR: ", e)
         db.rollback()
         raise HTTPException(status_code=400, detail="Invalid input data.")
+
+
+@router.patch(
+    "/movie-update/{movie_id}/",
+    summary="Update a movie by ID",
+    description=(
+        "<h3>Update details of a specific movie by its unique ID.</h3>"
+        "<p>This endpoint updates the details of an existing movie. If the movie with "
+        "the given ID does not exist, a 404 error is returned."
+        "Allowed by only moderators & admins.</p>"
+    ),
+    responses={
+        200: {
+            "description": "Movie updated successfully.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Movie updated successfully."}
+                }
+            },
+        },
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {"example": {"detail": "User unauthorized."}}
+            },
+        },
+        403: {
+            "description": "Forbidden.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "You don't have permission to do this operation."
+                    }
+                }
+            },
+        },
+        404: {
+            "description": "Movie not found.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Movie with the given ID was not found."}
+                }
+            },
+        },
+    },
+)
+def update_movie(
+    movie_id: int,
+    movie_data: MovieUpdateSchema,
+    db: Session = Depends(get_db),
+    token: str = Depends(get_token),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+):
+    """
+    Update a specific movie by its ID.
+
+    This function updates a movie identified by its unique ID.
+    If the movie does not exist, a 404 error is raised.
+    Allowed only by MODERATOR-users & ADMIN-users.
+
+    :param movie_id: The unique identifier of the movie to update.
+    :type movie_id: int
+    :param movie_data: The updated data for the movie.
+    :type movie_data: MovieUpdateSchema
+    :param db: The SQLAlchemy database session (provided via dependency injection).
+    :type db: Session
+    :param token: The token used to authenticate.
+    :type token: str
+    :param jwt_manager: The JWT manager used to authenticate.
+    :type jwt_manager: JWTAuthManagerInterface
+
+    :raises HTTPException: Raises a 404 error if the movie with the given ID is not found.
+
+    :return: A response indicating the successful update of the movie.
+    :rtype: None
+    """
+    try:
+        payload = jwt_manager.decode_access_token(token)
+        user_id = payload.get("user_id")
+    except BaseSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    user_group = (
+        db.query(UserGroupModel).join(UserModel).filter(UserModel.id == user_id).first()
+    )
+    if user_group == UserGroupEnum.USER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to do this operation.",
+        )
+
+    movie = db.query(MovieModel).filter(MovieModel.id == movie_id).first()
+    if not movie:
+        raise HTTPException(
+            status_code=404, detail="Movie with the given ID was not found."
+        )
+
+    try:
+        if movie_data.certification:
+            certification = (
+                db.query(CertificationModel)
+                .filter_by(name=movie_data.certification)
+                .first()
+            )
+            if not certification:
+                certification = CertificationModel(name=movie_data.certification)
+                db.add(certification)
+                db.flush()
+            del movie_data.certification
+            movie.certification_id = certification.id
+
+        for field, value in movie_data.model_dump(exclude_unset=True).items():
+            setattr(movie, field, value)
+
+        db.commit()
+        db.refresh(movie)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Invalid input data.")
+    else:
+        return {"detail": "Movie updated successfully."}
