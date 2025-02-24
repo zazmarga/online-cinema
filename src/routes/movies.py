@@ -2,7 +2,9 @@ from fastapi import APIRouter, Query, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from src.database.models.movies import MovieModel
+from src.database.session import get_db
 from src.schemas.movies import MovieListResponseSchema, MovieListItemSchema
+from src.security.http import get_token
 
 router = APIRouter()
 
@@ -50,6 +52,7 @@ def get_movie_list(
 
     :raises HTTPException: Raises a 404 error if no movies are found for the requested page.
     """
+
     offset = (page - 1) * per_page
 
     query = db.query(MovieModel).order_by()
@@ -71,12 +74,12 @@ def get_movie_list(
     response = MovieListResponseSchema(
         movies=movie_list,
         prev_page=(
-            f"/theater/movies/?page={page - 1}&per_page={per_page}"
+            f"/movies/movies-list?page={page - 1}&per_page={per_page}"
             if page > 1
             else None
         ),
         next_page=(
-            f"/theater/movies/?page={page + 1}&per_page={per_page}"
+            f"/movies/movies-list?page={page + 1}&per_page={per_page}"
             if page < total_pages
             else None
         ),

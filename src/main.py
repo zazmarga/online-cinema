@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from src.config.celery_app import celery_app
 from src.routes.accounts import router as accounts_router
+from src.routes.movies import router as movies_router
 
 
 app = FastAPI(
@@ -14,6 +15,10 @@ api_version_prefix = "/api/v1"
 
 app.include_router(
     accounts_router, prefix=f"{api_version_prefix}/accounts", tags=["accounts"]
+)
+
+app.include_router(
+    movies_router, prefix=f"{api_version_prefix}/movies", tags=["movies"]
 )
 
 

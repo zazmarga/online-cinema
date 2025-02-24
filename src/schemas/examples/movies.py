@@ -9,8 +9,8 @@ movie_item_schema_example = {
     "meta_score": 88.0,  #  or None
     "gross": 12345678.90,  #  or None
     "description": "Princess Odette and Prince Derek are going to a wedding at Princess Mei Li and her beloved Chen. "
-    "But evil forces are at stake and the wedding plans are tarnished and "
-    "true love has difficult conditions.",
+                    "But evil forces are at stake and the wedding plans are tarnished and "
+                    "true love has difficult conditions.",
     "price": 5.99,
     "certification_id": 2,
 }

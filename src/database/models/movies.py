@@ -138,8 +138,8 @@ class MovieModel(Base):
     time: Mapped[int] = mapped_column(Integer, nullable=False)
     imdb: Mapped[float] = mapped_column(Float, nullable=False)
     votes: Mapped[int] = mapped_column(Integer, nullable=False)
-    meta_score: Optional[Mapped[float]] = mapped_column(Float)
-    gross: Optional[Mapped[float]] = mapped_column(Float)
+    meta_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    gross: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     price: Mapped[float] = mapped_column(DECIMAL(10, 2), nullable=False)
     certification_id: Mapped[int] = mapped_column(
@@ -154,7 +154,7 @@ class MovieModel(Base):
         "GenreModel", secondary=MoviesGenresModel, back_populates="movies"
     )
 
-    actors: Mapped[list["StarModel"]] = relationship(
+    stars: Mapped[list["StarModel"]] = relationship(
         "StarModel", secondary=StarsMoviesModel, back_populates="movies"
     )
 
