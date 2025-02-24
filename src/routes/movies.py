@@ -22,6 +22,7 @@ from src.schemas.movies import (
     MovieCreateSchema,
     MovieUpdateSchema,
     MovieGenresUpdateSchema,
+    MovieDirectorsUpdateSchema,
 )
 from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
@@ -561,8 +562,7 @@ def update_movie_genres(
 
     :raises HTTPException: Raises a 404 error if the movie with the given ID is not found.
 
-    :return: A response indicating the successful update genres of the movie.
-    :rtype: None
+    :return: MovieDetailSchema
     """
     try:
         payload = jwt_manager.decode_access_token(token)
@@ -596,6 +596,123 @@ def update_movie_genres(
             genres.append(genre)
 
         movie.genres = genres
+        db.commit()
+        db.refresh(movie)
+
+        return movie
+
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Invalid input data.")
+
+
+@router.post(
+    "/{movie_id}/update-directors/",
+    response_model=MovieDetailSchema,
+    status_code=status.HTTP_200_OK,
+    summary="Update directors of a movie by ID",
+    description=(
+        "<h3>Update directors of a specific movie by its unique ID.</h3>"
+        "<p>This endpoint updates directors of an existing movie. If the movie with "
+        "the given ID does not exist, a 404 error is returned."
+        "Allowed by only moderators & admins.</p>"
+    ),
+    responses={
+        200: {
+            "description": "Directors of movie updated successfully.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Directors of movie updated successfully."}
+                }
+            },
+        },
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {"example": {"detail": "User unauthorized."}}
+            },
+        },
+        403: {
+            "description": "Forbidden.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "You don't have permission to do this operation."
+                    }
+                }
+            },
+        },
+        404: {
+            "description": "Movie not found.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Movie with the given ID was not found."}
+                }
+            },
+        },
+    },
+)
+def update_movie_directors(
+    movie_id: int,
+    data: MovieDirectorsUpdateSchema,
+    db: Session = Depends(get_db),
+    token: str = Depends(get_token),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+):
+    """
+    Update directors of a specific movie by its ID.
+
+    This function updates directors of a movie identified by its unique ID.
+    If the movie does not exist, a 404 error is raised.
+    Allowed only by MODERATOR-users & ADMIN-users.
+
+    :param movie_id: The unique identifier of the movie to update.
+    :type movie_id: int
+    :param data: The updated data for directors of a movie.
+    :type data: MovieDirectorsUpdateSchema
+    :param db: The SQLAlchemy database session (provided via dependency injection).
+    :type db: Session
+    :param token: The token used to authenticate.
+    :type token: str
+    :param jwt_manager: The JWT manager used to authenticate.
+    :type jwt_manager: JWTAuthManagerInterface
+
+    :raises HTTPException: Raises a 404 error if the movie with the given ID is not found.
+
+    :return: MovieDetailSchema
+    """
+    try:
+        payload = jwt_manager.decode_access_token(token)
+        user_id = payload.get("user_id")
+    except BaseSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    user_group = (
+        db.query(UserGroupModel).join(UserModel).filter(UserModel.id == user_id).first()
+    )
+    if user_group == UserGroupEnum.USER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to do this operation.",
+        )
+
+    movie = db.query(MovieModel).filter(MovieModel.id == movie_id).first()
+    if not movie:
+        raise HTTPException(
+            status_code=404, detail="Movie with the given ID was not found."
+        )
+
+    try:
+        directors = []
+        for director_name in data.directors:
+            director = db.query(DirectorModel).filter_by(name=director_name).first()
+            if not director:
+                director = DirectorModel(name=director_name)
+                db.add(director)
+                db.flush()
+            directors.append(director)
+
+        movie.directors = directors
         db.commit()
         db.refresh(movie)
 

@@ -66,6 +66,6 @@ movie_update_schema_example = {
     "of his clandestine empire to his reluctant son.",
 }
 
-movie_genres_update_schema_example = {
-    "genres": ["Gangster", "Crime", "Drama"]
-}
+movie_genres_update_schema_example = {"genres": ["Gangster", "Crime", "Drama"]}
+
+movie_directors_update_schema_example = {"directors": ["Lana Wachowski", "Lilly Wachowski"]}
