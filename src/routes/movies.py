@@ -41,6 +41,7 @@ router = APIRouter()
         "Clients can specify the `page` number and the number of items per page using `per_page`. "
         "The response includes details about the movies, total pages, and total items, "
         "along with links to the previous and next pages if applicable.</h3>"
+        "Optional: can sorting movies by different attributes (name, year, price, etc)."
     ),
     responses={
         401: {
@@ -72,6 +73,7 @@ def get_movie_list(
     This function retrieves a paginated list of movies, allowing the client to specify
     the page number and the number of items per page. It calculates the total pages
     and provides links to the previous and next pages when applicable.
+    Optional: can sorting movies by different attributes (name, year, price, etc).
 
     :param page: The page number to retrieve (1-based index, must be >= 1).
     :type page: int
