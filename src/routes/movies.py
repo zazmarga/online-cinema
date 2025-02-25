@@ -1,4 +1,5 @@
 import uuid
+from typing import Optional
 
 from fastapi import APIRouter, Query, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
@@ -61,6 +62,7 @@ router = APIRouter()
 def get_movie_list(
     page: int = Query(1, ge=1, description="Page number (1-based index)"),
     per_page: int = Query(10, ge=1, le=20, description="Number of items per page"),
+    sort_by: Optional[str] = Query(None, description="Sorting movies by any attribute"),
     token: str = Depends(get_token),
     db: Session = Depends(get_db),
 ) -> MovieListResponseSchema:
@@ -75,6 +77,10 @@ def get_movie_list(
     :type page: int
     :param per_page: The number of items to display per page (must be between 1 and 20).
     :type per_page: int
+    :param sort_by: For sorting movies by any attribute.
+    :type sort_by: str
+    :param token: Token used to authenticate.
+    :type token: str
     :param token: Token used to authenticate.
     :type token: str
     :param db: The SQLAlchemy database session (provided via dependency injection).
@@ -96,7 +102,10 @@ def get_movie_list(
     query = db.query(MovieModel).order_by()
 
     order_by = MovieModel.default_order_by()
-    if order_by:
+
+    if sort_by:
+        query = query.order_by(sort_by)
+    else:
         query = query.order_by(*order_by)
 
     total_items = query.count()
@@ -109,18 +118,25 @@ def get_movie_list(
 
     total_pages = (total_items + per_page - 1) // per_page
 
+    prev_page = (
+        f"/movies/movies-list/?page={page - 1}&per_page={per_page}"
+        if page > 1
+        else None
+    )
+    next_page = (
+        f"/movies/movies-list/?page={page + 1}&per_page={per_page}"
+        if page < total_pages
+        else None
+    )
+
+    if sort_by:
+        prev_page = f"{prev_page}&sort_by={sort_by}" if prev_page is not None else None
+        next_page = f"{next_page}&sort_by={sort_by}" if next_page is not None else None
+
     response = MovieListResponseSchema(
         movies=movie_list,
-        prev_page=(
-            f"/movies/movies-list/?page={page - 1}&per_page={per_page}"
-            if page > 1
-            else None
-        ),
-        next_page=(
-            f"/movies/movies-list/?page={page + 1}&per_page={per_page}"
-            if page < total_pages
-            else None
-        ),
+        prev_page=prev_page,
+        next_page=next_page,
         total_pages=total_pages,
         total_items=total_items,
     )
