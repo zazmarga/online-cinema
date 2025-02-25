@@ -2,10 +2,12 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Query, Depends, HTTPException, status
+from fastapi_filter import FilterDepends
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from src.config.dependencies import get_jwt_auth_manager
+from src.database.filters.movies import MovieFilter
 from src.database.models.accounts import UserGroupModel, UserModel, UserGroupEnum
 from src.database.models.movies import (
     MovieModel,
@@ -41,7 +43,10 @@ router = APIRouter()
         "Clients can specify the `page` number and the number of items per page using `per_page`. "
         "The response includes details about the movies, total pages, and total items, "
         "along with links to the previous and next pages if applicable.</h3>"
-        "Optional: can sorting movies by different attributes (name, year, price, etc)."
+        "<p>Optional: can sort movies by different attributes (name, year, price, etc).</p>"
+        "<p>Optional: can filer movies nameContains (movie name contains.. case-insensitive), "
+        "yearOfRelease (year/list[years] of release) & "
+        "IMDbRatingFrom (movies with IMDb rating greater than or equal to the specified value).</p>"
     ),
     responses={
         401: {
@@ -64,6 +69,7 @@ def get_movie_list(
     page: int = Query(1, ge=1, description="Page number (1-based index)"),
     per_page: int = Query(10, ge=1, le=20, description="Number of items per page"),
     sort_by: Optional[str] = Query(None, description="Sorting movies by any attribute"),
+    movie_filter: Optional[MovieFilter] = FilterDepends(MovieFilter),
     token: str = Depends(get_token),
     db: Session = Depends(get_db),
 ) -> MovieListResponseSchema:
@@ -73,7 +79,7 @@ def get_movie_list(
     This function retrieves a paginated list of movies, allowing the client to specify
     the page number and the number of items per page. It calculates the total pages
     and provides links to the previous and next pages when applicable.
-    Optional: can sorting movies by different attributes (name, year, price, etc).
+    Optional: can sort movies by different attributes (name, year, price, etc).
 
     :param page: The page number to retrieve (1-based index, must be >= 1).
     :type page: int
@@ -81,8 +87,8 @@ def get_movie_list(
     :type per_page: int
     :param sort_by: For sorting movies by any attribute.
     :type sort_by: str
-    :param token: Token used to authenticate.
-    :type token: str
+    :param movie_filter: For filtering movies by some attributes.
+    :type movie_filter: FilterDepends
     :param token: Token used to authenticate.
     :type token: str
     :param db: The SQLAlchemy database session (provided via dependency injection).
@@ -102,6 +108,9 @@ def get_movie_list(
     offset = (page - 1) * per_page
 
     query = db.query(MovieModel).order_by()
+
+    if movie_filter:
+        query = movie_filter.filter(query)
 
     order_by = MovieModel.default_order_by()
 
