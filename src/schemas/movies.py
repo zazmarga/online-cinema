@@ -10,8 +10,11 @@ from src.schemas.examples.movies import (
     director_schema_example,
     star_schema_example,
     movie_detail_schema_example,
-    movie_create_schema_example, movie_update_schema_example, movie_genres_update_schema_example,
-    movie_directors_update_schema_example, movie_stars_update_schema_example,
+    movie_create_schema_example,
+    movie_update_schema_example,
+    movie_genres_update_schema_example,
+    movie_directors_update_schema_example,
+    movie_stars_update_schema_example,
 )
 
 
@@ -30,7 +33,7 @@ class MovieBaseSchema(BaseModel):
 
     @field_validator("year")
     @classmethod
-    def validate_date(cls, value):
+    def validate_year(cls, value):
         current_year = int(datetime.now().year)
         if value > current_year + 1:
             raise ValueError(f"The 'year' cannot be greater than {current_year + 1}.")
@@ -176,3 +179,11 @@ class MovieStarsUpdateSchema(BaseModel):
         "from_attributes": True,
         "json_schema_extra": {"examples": [movie_stars_update_schema_example]},
     }
+
+
+class MovieSearchResponseSchema(BaseModel):
+    movie: MovieListItemSchema
+
+
+class MovieSearchResultSchema(BaseModel):
+    movies: List[MovieSearchResponseSchema]

@@ -1,6 +1,4 @@
 from typing import Optional
-import uuid
-from sqlalchemy_utils import UUIDType
 
 from sqlalchemy import (
     String,

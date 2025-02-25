@@ -1,4 +1,5 @@
 from typing import Optional, List
+
 from fastapi_filter.contrib.sqlalchemy import Filter
 from pydantic import Field
 
@@ -27,3 +28,7 @@ class MovieFilter(Filter):
 
     class Config:
         populate_by_name = True
+
+
+def normalize_search_list(search_list: List[str]) -> List[str]:
+    return [item.title() for item in search_list]

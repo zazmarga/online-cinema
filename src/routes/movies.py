@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import APIRouter, Query, Depends, HTTPException, status
 from fastapi_filter import FilterDepends
@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from src.config.dependencies import get_jwt_auth_manager
-from src.database.filters.movies import MovieFilter
+from src.database.filters.movies import MovieFilter, normalize_search_list
 from src.database.models.accounts import UserGroupModel, UserModel, UserGroupEnum
 from src.database.models.movies import (
     MovieModel,
@@ -27,6 +27,8 @@ from src.schemas.movies import (
     MovieGenresUpdateSchema,
     MovieDirectorsUpdateSchema,
     MovieStarsUpdateSchema,
+    MovieSearchResponseSchema,
+    MovieSearchResultSchema,
 )
 from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
@@ -152,6 +154,107 @@ def get_movie_list(
         total_items=total_items,
     )
     return response
+
+
+@router.get(
+    "/search/",
+    response_model=MovieSearchResultSchema,
+    status_code=status.HTTP_200_OK,
+    summary="Search Movies By Directors, Genres & Stars.",
+    description="Search movies based on query parameters like directors, genres, and stars.",
+    responses={
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {"example": {"detail": "User unauthorized."}}
+            },
+        },
+        404: {
+            "description": "Movie not found.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Movie with these parameters not found."}
+                }
+            },
+        },
+    },
+)
+def search_movies(
+    directors: Optional[List[str]] = Query(
+        None, description="List of directors (ex.: Steven Spielberg)"
+    ),
+    genres: Optional[List[str]] = Query(
+        None, description="List of genres (ex.: Action, Drama)"
+    ),
+    stars: Optional[List[str]] = Query(
+        None, description="List of stars (ex.: Tom Hanks, Al Pacino)"
+    ),
+    db: Session = Depends(get_db),
+    token: str = Depends(get_token),
+) -> MovieSearchResultSchema:
+    """
+    Search movies based on query parameters like directors, genres, and stars.
+
+    :param directors: List of directors (ex.: Steven Spielberg)
+    :type directors: List[str]
+    :param genres: List of genres (ex.: Action, Drama)
+    :type genres: List[str]
+    :param stars: List of stars (ex.: Tom Hanks, Al Pacino)
+    :type stars: List[str]
+    :param db: The SQLAlchemy database session (provided via dependency injection).
+    :type db: Session
+    :param token: The token used to authenticate.
+    :type token: str
+
+    :return: MovieSearchResponseSchema
+    """
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header is missing.",
+        )
+
+    search_movies_query = db.query(MovieModel)
+
+    if directors:
+        directors = normalize_search_list(directors)
+        search_movies_query = search_movies_query.filter(
+            MovieModel.directors.any(DirectorModel.name.in_(directors))
+        )
+
+    if genres:
+        genres = normalize_search_list(genres)
+        search_movies_query = search_movies_query.filter(
+            MovieModel.genres.any(GenreModel.name.in_(genres))
+        )
+
+    if stars:
+        stars = normalize_search_list(stars)
+        search_movies_query = search_movies_query.filter(
+            MovieModel.stars.any(StarModel.name.in_(stars))
+        )
+
+    movie_list = [
+        MovieSearchResponseSchema(
+            movie=MovieListItemSchema(
+                id=movie.id,
+                name=movie.name,
+                year=movie.year,
+                time=movie.time,
+                imdb=movie.imdb,
+                description=movie.description,
+                price=movie.price,
+            )
+        )
+        for movie in search_movies_query
+    ]
+
+    if movie_list:
+        return MovieSearchResultSchema(movies=movie_list)
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found."
+    )
 
 
 @router.get(
