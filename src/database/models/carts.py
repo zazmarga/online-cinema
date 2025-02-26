@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
-from enum import unique
 
-from sqlalchemy import ForeignKey, UniqueConstraint, DateTime
+from sqlalchemy import ForeignKey, UniqueConstraint, DateTime, Table, Column
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 from src.database.models.accounts import UserModel
@@ -48,3 +47,24 @@ class CartItemModel(Base):
 
     def __repr__(self):
         return f"<CartItem(cart_id='{self.cart_id}', movie_id='{self.movie_id}')>"
+
+
+PurchasedMovieModel = Table(
+    "purchased_movies",
+    Base.metadata,
+    Column(
+        "user_id",
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    ),
+    Column(
+        "movie_id",
+        ForeignKey("movies.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    ),
+    __table_args__=(
+        UniqueConstraint("user_id", "movie_id", name="unique_movie_constraint"),
+    ),
+)
