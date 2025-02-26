@@ -187,3 +187,12 @@ class MovieSearchResponseSchema(BaseModel):
 
 class MovieSearchResultSchema(BaseModel):
     movies: List[MovieSearchResponseSchema]
+
+
+class MovieGenresSchema(BaseModel):
+    genre: GenreSchema
+    count_of_movies: int
+
+    model_config = {
+        "from_attributes": True,
+    }

@@ -3,6 +3,7 @@ from typing import Optional, List
 
 from fastapi import APIRouter, Query, Depends, HTTPException, status
 from fastapi_filter import FilterDepends
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -15,6 +16,7 @@ from src.database.models.movies import (
     GenreModel,
     StarModel,
     DirectorModel,
+    MoviesGenresModel,
 )
 from src.database.session import get_db
 from src.exceptions.security import BaseSecurityError
@@ -29,6 +31,7 @@ from src.schemas.movies import (
     MovieStarsUpdateSchema,
     MovieSearchResponseSchema,
     MovieSearchResultSchema,
+    MovieGenresSchema,
 )
 from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
@@ -969,3 +972,66 @@ def update_movie_stars(
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=400, detail="Invalid input data.")
+
+
+@router.get(
+    "/genres-list/",
+    response_model=List[MovieGenresSchema],
+    status_code=status.HTTP_200_OK,
+    summary="Get list of genres with count of movies",
+    description=("<h3>Get list of genres with count of movies in each genre.</h3>"),
+    responses={
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {"example": {"detail": "User unauthorized."}}
+            },
+        },
+        404: {
+            "description": "Genres not found.",
+            "content": {
+                "application/json": {"example": {"detail": "Genres not found."}}
+            },
+        },
+    },
+)
+def get_genres_list_with_count_of_movie(
+    token: str = Depends(get_token),
+    db: Session = Depends(get_db),
+) -> List[MovieGenresSchema]:
+    """
+    Get list of genres with count of movies in each genre.
+
+    :param db: The SQLAlchemy database session (provided via dependency injection).
+    :type db: Session
+    :param token: The token used to authenticate.
+    :type token: str
+
+    :return: MovieGenresListSchema
+    """
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header is missing.",
+        )
+
+    genres = (
+        db.query(GenreModel, func.count(MovieModel.id).label("movie_count"))
+        .select_from(GenreModel)
+        .join(MoviesGenresModel, MoviesGenresModel.c.genre_id == GenreModel.id)
+        .join(MovieModel, MovieModel.id == MoviesGenresModel.c.movie_id)
+        .group_by(GenreModel.id)
+        .all()
+    )
+
+    if not genres:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Genres not found."
+        )
+
+    genres_list = [
+        MovieGenresSchema(genre=genre, count_of_movies=movie_count)
+        for genre, movie_count in genres
+    ]
+
+    return genres_list
