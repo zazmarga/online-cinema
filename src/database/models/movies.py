@@ -171,3 +171,37 @@ class MovieModel(Base):
 
     def __repr__(self):
         return f"<Movie(name='{self.name}', release_date='{self.year}', duration={self.time})>"
+
+
+FavoriteMovieModel = Table(
+    "favorite_movies",
+    Base.metadata,
+    Column(
+        "user_id",
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    ),
+    Column(
+        "movie_id",
+        ForeignKey("movies.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    ),
+    UniqueConstraint("user_id", "movie_id", name="unique_movie_constraint"),
+)
+
+
+def add_favorite_movie(session, user_id, movie_id):
+    insert = FavoriteMovieModel.insert().values(user_id=user_id, movie_id=movie_id)
+    session.execute(insert)
+    session.commit()
+
+
+def remove_favorite_movie(session, user_id, movie_id):
+    delete = FavoriteMovieModel.delete().where(
+        (FavoriteMovieModel.c.user_id == user_id)
+        & (FavoriteMovieModel.c.movie_id == movie_id)
+    )
+    session.execute(delete)
+    session.commit()
