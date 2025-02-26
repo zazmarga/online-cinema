@@ -75,3 +75,16 @@ movie_directors_update_schema_example = {
 movie_stars_update_schema_example = {
     "stars": ["Marlon Brando", "Al Pacino", "James Caan"]
 }
+
+movie_detail_actions_schema_example = {
+    "movie": {
+        "id": 4,
+        "name": "Matrix",
+        "year": 1999,
+        "time": 136,
+        "imdb": 8.7,
+        "description": "When a beautiful stranger leads computer hacker Neo to a forbidding underworld, he discovers the shocking truth--the life he knows is the elaborate deception of an evil cyber-intelligence.",
+        "price": 14.99,
+    },
+    "is_favorite": True,  #  or None
+}

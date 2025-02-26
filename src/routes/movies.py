@@ -17,6 +17,8 @@ from src.database.models.movies import (
     StarModel,
     DirectorModel,
     MoviesGenresModel,
+    add_favorite_movie,
+    remove_favorite_movie,
 )
 from src.database.session import get_db
 from src.exceptions.security import BaseSecurityError
@@ -32,6 +34,7 @@ from src.schemas.movies import (
     MovieSearchResponseSchema,
     MovieSearchResultSchema,
     MovieGenresSchema,
+    MovieDetailActionsSchema,
 )
 from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
@@ -40,7 +43,7 @@ router = APIRouter()
 
 
 @router.get(
-    "/movies-list/",
+    "/",
     response_model=MovieListResponseSchema,
     summary="Get a paginated list of movies",
     description=(
@@ -261,7 +264,7 @@ def search_movies(
 
 
 @router.get(
-    "/movie-detail/{movie_id}/",
+    "/{movie_id}/",
     response_model=MovieDetailSchema,
     summary="Get movie details by ID",
     description=(
@@ -336,6 +339,98 @@ def get_movie_by_id(
         )
 
     return MovieDetailSchema.model_validate(movie)
+
+
+@router.post(
+    "/{movie_id}/",
+    response_model=MovieDetailActionsSchema,
+    summary="Add user-actions to movie by ID",
+    description=(
+        "<h3>Add some user-actions to a specific movie by its unique ID. </h3>"
+        "<p>This endpoint allows to add some user-actions for the movie, such as "
+        "add/delete to favorite, liked/disliked, add to user's cart, "
+        "add user-comment and rate (on a 10-point scale). </p>"
+        "<p>If the movie with the given "
+        "ID is not found, a 404 error will be returned.</p>"
+        "<p>Only for register users. If not token, a 401 error will be returned.</p>"
+    ),
+    responses={
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Authorization header is missing."}
+                }
+            },
+        },
+        404: {
+            "description": "Movie not found.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Movie with the given ID was not found."}
+                }
+            },
+        },
+    },
+)
+def actions_to_movie_by_id(
+    movie_id: int,
+    is_favorite: Optional[bool] = Query(
+        None, description="Add to favorite (ex.: true)"
+    ),
+    db: Session = Depends(get_db),
+    token: str = Depends(get_token),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+) -> MovieDetailActionsSchema:
+    """
+    Add some user-actions to a specific movie by its unique ID.
+
+    This endpoint allows to add some user-actions for the movie, such as
+    add/delete to favorite, liked/disliked, add to user's cart,
+    add user-comment and rate (on a 10-point scale).
+    If the movie with the given
+    ID is not found, a 404 error will be returned.
+    Only for register users. If not token, a 401 error will be returned.
+
+    :param movie_id: The unique identifier of the movie to retrieve.
+    :type movie_id: int
+    :param is_favorite: Whether the movie is favorite or not.
+    :type is_favorite: bool
+    :param db: The SQLAlchemy database session (provided via dependency injection).
+    :type db: Session
+    :param token: Token used to authenticate.
+    :type token: str
+    :param jwt_manager: The JWT manager used to authenticate.
+    :type jwt_manager: JWTAuthManagerInterface
+
+    :return: The details of the requested movie.
+    :rtype: MovieDetailResponseSchema
+
+    :raises HTTPException: Raises a 404 error if the movie with the given ID is not found.
+    """
+    try:
+        payload = jwt_manager.decode_access_token(token)
+        user_id = payload.get("user_id")
+    except BaseSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    movie = db.query(MovieModel).filter(MovieModel.id == movie_id).first()
+
+    if not movie:
+        raise HTTPException(
+            status_code=404, detail="Movie with the given ID was not found."
+        )
+
+    if is_favorite is not None:
+        try:
+            if is_favorite is True:
+                add_favorite_movie(session=db, user_id=user_id, movie_id=movie.id)
+            elif is_favorite is False:
+                remove_favorite_movie(session=db, user_id=user_id, movie_id=movie.id)
+        except IntegrityError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    return MovieDetailActionsSchema(movie=movie, is_favorite=is_favorite)
 
 
 @router.post(
@@ -503,7 +598,7 @@ def create_movie(
 
 
 @router.patch(
-    "/movie-update/{movie_id}/",
+    "/{movie_id}/update-movie-info/",
     summary="Update a movie by ID",
     description=(
         "<h3>Update details of a specific movie by its unique ID.</h3>"
@@ -975,7 +1070,7 @@ def update_movie_stars(
 
 
 @router.get(
-    "/genres-list/",
+    "/by-genres/",
     response_model=List[MovieGenresSchema],
     status_code=status.HTTP_200_OK,
     summary="Get list of genres with count of movies",

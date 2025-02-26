@@ -15,6 +15,7 @@ from src.schemas.examples.movies import (
     movie_genres_update_schema_example,
     movie_directors_update_schema_example,
     movie_stars_update_schema_example,
+    movie_detail_actions_schema_example,
 )
 
 
@@ -195,4 +196,14 @@ class MovieGenresSchema(BaseModel):
 
     model_config = {
         "from_attributes": True,
+    }
+
+
+class MovieDetailActionsSchema(BaseModel):
+    movie: MovieListItemSchema
+    is_favorite: Optional[bool] = None
+
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {"examples": [movie_detail_actions_schema_example]},
     }
