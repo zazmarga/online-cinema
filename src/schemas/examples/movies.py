@@ -87,6 +87,7 @@ movie_detail_actions_schema_example = {
         "price": 14.99,
     },
     "is_favorite": True,  #  or None
+    "is_liked": True,  #  or None
 }
 
 movie_list_favorite_schema_example = {"movies": [movie_item_schema_example]}

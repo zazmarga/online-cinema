@@ -15,7 +15,8 @@ from src.schemas.examples.movies import (
     movie_genres_update_schema_example,
     movie_directors_update_schema_example,
     movie_stars_update_schema_example,
-    movie_detail_actions_schema_example, movie_list_favorite_schema_example,
+    movie_detail_actions_schema_example,
+    movie_list_favorite_schema_example,
 )
 
 
@@ -202,6 +203,7 @@ class MovieGenresSchema(BaseModel):
 class MovieDetailActionsSchema(BaseModel):
     movie: MovieListItemSchema
     is_favorite: Optional[bool] = None
+    is_liked: Optional[bool] = None
 
     model_config = {
         "from_attributes": True,

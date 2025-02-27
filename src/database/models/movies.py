@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional
 
 from sqlalchemy import (
     String,
@@ -10,11 +10,11 @@ from sqlalchemy import (
     Text,
     DECIMAL,
     UniqueConstraint,
+    Boolean
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.models.base import Base
-from src.schemas.movies import MovieListItemSchema
 
 MoviesGenresModel = Table(
     "movie_genres",
@@ -192,28 +192,24 @@ FavoriteMovieModel = Table(
 )
 
 
-def add_favorite_movie(session, user_id, movie_id):
-    insert = FavoriteMovieModel.insert().values(user_id=user_id, movie_id=movie_id)
-    session.execute(insert)
-    session.commit()
-
-
-def remove_favorite_movie(session, user_id, movie_id):
-    delete = FavoriteMovieModel.delete().where(
-        (FavoriteMovieModel.c.user_id == user_id)
-        & (FavoriteMovieModel.c.movie_id == movie_id)
-    )
-    session.execute(delete)
-    session.commit()
-
-
-
-def fetch_list_favorite_movies(session: Session, user_id: int) -> List[MovieListItemSchema]:
-    movies = (
-        session.query(MovieModel)
-        .join(FavoriteMovieModel, FavoriteMovieModel.c.movie_id == MovieModel.id)
-        .filter(FavoriteMovieModel.c.user_id == user_id)
-        .all()
-    )
-
-    return movies
+LikeMovieModel = Table(
+    "liked_unliked_movies",
+    Base.metadata,
+    Column(
+        "user_id",
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    ),
+    Column(
+        "movie_id",
+        ForeignKey("movies.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    ),
+    Column(
+        "is_liked",
+        Boolean,
+    ),
+    UniqueConstraint("user_id", "movie_id", name="unique_movie_constraint"),
+)

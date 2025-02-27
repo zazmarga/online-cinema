@@ -17,8 +17,14 @@ from src.database.models.movies import (
     StarModel,
     DirectorModel,
     MoviesGenresModel,
-    add_favorite_movie,
-    remove_favorite_movie,
+    FavoriteMovieModel,
+    LikeMovieModel,
+)
+from src.database.services.movies import (
+    add_movie_to_table,
+    remove_movie_from_table,
+    update_is_liked,
+    check_record_exists,
     fetch_list_favorite_movies,
 )
 from src.database.session import get_db
@@ -378,7 +384,10 @@ def get_movie_by_id(
 def actions_to_movie_by_id(
     movie_id: int,
     is_favorite: Optional[bool] = Query(
-        None, description="Add to favorite (ex.: true)"
+        None, description="Add to favorite: true, remove: false, not action: --"
+    ),
+    is_liked: Optional[bool] = Query(
+        None, description="Add like: true, add dislike: false, remove all: --"
     ),
     db: Session = Depends(get_db),
     token: str = Depends(get_token),
@@ -398,6 +407,8 @@ def actions_to_movie_by_id(
     :type movie_id: int
     :param is_favorite: Whether the movie is favorite or not.
     :type is_favorite: bool
+    :param is_liked: Whether the movie is liked or not.
+    :type is_liked: bool
     :param db: The SQLAlchemy database session (provided via dependency injection).
     :type db: Session
     :param token: Token used to authenticate.
@@ -426,13 +437,54 @@ def actions_to_movie_by_id(
     if is_favorite is not None:
         try:
             if is_favorite is True:
-                add_favorite_movie(session=db, user_id=user_id, movie_id=movie.id)
+                add_movie_to_table(
+                    session=db,
+                    user_id=user_id,
+                    movie_id=movie.id,
+                    table_name=FavoriteMovieModel,
+                )
             elif is_favorite is False:
-                remove_favorite_movie(session=db, user_id=user_id, movie_id=movie.id)
+                remove_movie_from_table(
+                    session=db,
+                    user_id=user_id,
+                    movie_id=movie.id,
+                    table_name=FavoriteMovieModel,
+                )
         except IntegrityError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
-    return MovieDetailActionsSchema(movie=movie, is_favorite=is_favorite)
+    try:
+        if is_liked is not None:
+            if not check_record_exists(
+                db, user_id=user_id, movie_id=movie.id, table_name=LikeMovieModel
+            ):
+                add_movie_to_table(
+                    session=db,
+                    user_id=user_id,
+                    movie_id=movie.id,
+                    table_name=LikeMovieModel,
+                )
+            update_is_liked(db, user_id=user_id, movie_id=movie.id, is_liked=is_liked)
+        else:
+            remove_movie_from_table(
+                session=db,
+                user_id=user_id,
+                movie_id=movie.id,
+                table_name=LikeMovieModel,
+            )
+    except IntegrityError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if check_record_exists(
+        db, user_id=user_id, movie_id=movie.id, table_name=FavoriteMovieModel
+    ):
+        is_favorite = True
+    else:
+        is_favorite = False
+
+    return MovieDetailActionsSchema(
+        movie=movie, is_favorite=is_favorite, is_liked=is_liked
+    )
 
 
 @router.post(
