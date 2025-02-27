@@ -88,3 +88,5 @@ movie_detail_actions_schema_example = {
     },
     "is_favorite": True,  #  or None
 }
+
+movie_list_favorite_schema_example = {"movies": [movie_item_schema_example]}

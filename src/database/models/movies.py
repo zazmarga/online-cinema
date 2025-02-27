@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from sqlalchemy import (
     String,
@@ -11,10 +11,10 @@ from sqlalchemy import (
     DECIMAL,
     UniqueConstraint,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
 
 from src.database.models.base import Base
-
+from src.schemas.movies import MovieListItemSchema
 
 MoviesGenresModel = Table(
     "movie_genres",
@@ -205,3 +205,15 @@ def remove_favorite_movie(session, user_id, movie_id):
     )
     session.execute(delete)
     session.commit()
+
+
+
+def fetch_list_favorite_movies(session: Session, user_id: int) -> List[MovieListItemSchema]:
+    movies = (
+        session.query(MovieModel)
+        .join(FavoriteMovieModel, FavoriteMovieModel.c.movie_id == MovieModel.id)
+        .filter(FavoriteMovieModel.c.user_id == user_id)
+        .all()
+    )
+
+    return movies

@@ -19,6 +19,7 @@ from src.database.models.movies import (
     MoviesGenresModel,
     add_favorite_movie,
     remove_favorite_movie,
+    fetch_list_favorite_movies,
 )
 from src.database.session import get_db
 from src.exceptions.security import BaseSecurityError
@@ -35,6 +36,7 @@ from src.schemas.movies import (
     MovieSearchResultSchema,
     MovieGenresSchema,
     MovieDetailActionsSchema,
+    MovieListFavoriteSchema,
 )
 from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
@@ -1130,3 +1132,61 @@ def get_genres_list_with_count_of_movie(
     ]
 
     return genres_list
+
+
+@router.get(
+    "/user/favorite-movies/",
+    response_model=MovieListFavoriteSchema,
+    summary="Get a list favorite movies",
+    description=(
+        "<h3>This endpoint retrieves a list of favorite movies from the database. </h3>"
+    ),
+    responses={
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Authorization header is missing."}
+                }
+            },
+        },
+        404: {
+            "description": "No movies found.",
+            "content": {
+                "application/json": {"example": {"detail": "No movies found."}}
+            },
+        },
+    },
+)
+def get_list_favorite_movies(
+    token: str = Depends(get_token),
+    db: Session = Depends(get_db),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+) -> MovieListFavoriteSchema:
+    """
+    Fetch a list of favorite movies from the database.
+
+    :param token: Token used to authenticate.
+    :type token: str
+    :param db: The SQLAlchemy database session (provided via dependency injection).
+    :type db: Session
+    :param jwt_manager: The JWT manager used to authenticate.
+    :type jwt_manager: JWTAuthManagerInterface
+
+    :return: A response containing the list of favorite movies and metadata.
+    :rtype: MovieListResponseSchema
+
+    :raises HTTPException: Raises a 401 if user unauthorized. Raises a 404 error if no movies are found for the requested page.
+    """
+    try:
+        payload = jwt_manager.decode_access_token(token)
+        user_id = payload.get("user_id")
+    except BaseSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    list_favorite_movies = fetch_list_favorite_movies(session=db, user_id=user_id)
+
+    if not list_favorite_movies:
+        raise HTTPException(status_code=404, detail="No favorite movies found.")
+
+    return MovieListFavoriteSchema(movies=list_favorite_movies)
