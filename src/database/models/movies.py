@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Optional
 
 from sqlalchemy import (
@@ -10,7 +11,7 @@ from sqlalchemy import (
     Text,
     DECIMAL,
     UniqueConstraint,
-    Boolean
+    Boolean,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -213,3 +214,43 @@ LikeMovieModel = Table(
     ),
     UniqueConstraint("user_id", "movie_id", name="unique_movie_constraint"),
 )
+
+
+class ConfirmationEnum(str, Enum):
+    yes = "yes"
+
+class RatingEnum(int, Enum):
+    one = 1
+    two = 2
+    three = 3
+    four = 4
+    five = 5
+    six = 6
+    seven = 7
+    eight = 8
+    nine = 9
+    ten = 10
+
+
+RatingMovieModel = Table(
+    "rating_movies",
+    Base.metadata,
+    Column(
+        "user_id",
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    ),
+    Column(
+        "movie_id",
+        ForeignKey("movies.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    ),
+    Column(
+        "rating",
+        Integer,
+    ),
+    UniqueConstraint("user_id", "movie_id", name="unique_movie_constraint"),
+)
+

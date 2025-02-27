@@ -19,11 +19,14 @@ from src.database.models.movies import (
     MoviesGenresModel,
     FavoriteMovieModel,
     LikeMovieModel,
+    RatingEnum,
+    RatingMovieModel,
+    ConfirmationEnum,
 )
 from src.database.services.movies import (
     add_movie_to_table,
     remove_movie_from_table,
-    update_is_liked,
+    update_table_field,
     check_record_exists,
     fetch_list_favorite_movies,
 )
@@ -387,7 +390,13 @@ def actions_to_movie_by_id(
         None, description="Add to favorite: true, remove: false, not action: --"
     ),
     is_liked: Optional[bool] = Query(
-        None, description="Add like: true, add dislike: false, remove all: --"
+        None, description="Add like: true, add dislike: false, not action: --"
+    ),
+    remove_like_dislike: ConfirmationEnum = Query(
+        None, description="Remove like or dislike for this movie: yes, not action: --"
+    ),
+    to_rate: RatingEnum = Query(
+        None, description="To rate the movie: 1 to 10, do not rate: --"
     ),
     db: Session = Depends(get_db),
     token: str = Depends(get_token),
@@ -434,26 +443,29 @@ def actions_to_movie_by_id(
             status_code=404, detail="Movie with the given ID was not found."
         )
 
-    if is_favorite is not None:
-        try:
-            if is_favorite is True:
-                add_movie_to_table(
-                    session=db,
-                    user_id=user_id,
-                    movie_id=movie.id,
-                    table_name=FavoriteMovieModel,
-                )
-            elif is_favorite is False:
-                remove_movie_from_table(
-                    session=db,
-                    user_id=user_id,
-                    movie_id=movie.id,
-                    table_name=FavoriteMovieModel,
-                )
-        except IntegrityError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-
     try:
+        #  is_favorite
+        if is_favorite is not None:
+            if not check_record_exists(
+                db, user_id=user_id, movie_id=movie.id, table_name=FavoriteMovieModel
+            ):
+                if is_favorite is True:
+                    add_movie_to_table(
+                        session=db,
+                        user_id=user_id,
+                        movie_id=movie.id,
+                        table_name=FavoriteMovieModel,
+                    )
+            else:
+                if is_favorite is False:
+                    remove_movie_from_table(
+                        session=db,
+                        user_id=user_id,
+                        movie_id=movie.id,
+                        table_name=FavoriteMovieModel,
+                    )
+
+        # is_liked
         if is_liked is not None:
             if not check_record_exists(
                 db, user_id=user_id, movie_id=movie.id, table_name=LikeMovieModel
@@ -464,26 +476,53 @@ def actions_to_movie_by_id(
                     movie_id=movie.id,
                     table_name=LikeMovieModel,
                 )
-            update_is_liked(db, user_id=user_id, movie_id=movie.id, is_liked=is_liked)
-        else:
+            update_table_field(
+                db,
+                user_id=user_id,
+                movie_id=movie.id,
+                table_name=LikeMovieModel,
+                table_field=LikeMovieModel.c.is_liked,
+                value=is_liked,
+            )
+
+        #  remove_like_dislike
+        if remove_like_dislike is not None:
             remove_movie_from_table(
                 session=db,
                 user_id=user_id,
                 movie_id=movie.id,
                 table_name=LikeMovieModel,
             )
+
+        #  to_rate
+        if to_rate is not None:
+            if not check_record_exists(
+                db, user_id=user_id, movie_id=movie.id, table_name=RatingMovieModel
+            ):
+                add_movie_to_table(
+                    session=db,
+                    user_id=user_id,
+                    movie_id=movie.id,
+                    table_name=RatingMovieModel,
+                )
+            update_table_field(
+                db,
+                user_id=user_id,
+                movie_id=movie.id,
+                table_name=RatingMovieModel,
+                table_field=RatingMovieModel.c.rating,
+                value=to_rate,
+            )
+
     except IntegrityError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    if check_record_exists(
-        db, user_id=user_id, movie_id=movie.id, table_name=FavoriteMovieModel
-    ):
-        is_favorite = True
-    else:
-        is_favorite = False
-
     return MovieDetailActionsSchema(
-        movie=movie, is_favorite=is_favorite, is_liked=is_liked
+        movie=movie,
+        is_favorite=is_favorite,
+        is_liked=is_liked,
+        remove_like_dislike=remove_like_dislike,
+        to_rate=to_rate,
     )
 
 

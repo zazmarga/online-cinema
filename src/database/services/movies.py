@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Any
 
 from sqlalchemy import update
 from sqlalchemy.orm import Session
@@ -43,13 +43,13 @@ def check_record_exists(session: Session, user_id: int, movie_id: int, table_nam
     return like_exists is not None
 
 
-def update_is_liked(session: Session, user_id: int, movie_id: int, is_liked: bool):
+def update_table_field(
+    session: Session, user_id: int, movie_id: int, table_name, table_field, value: Any
+):
     stmt = (
-        update(LikeMovieModel)
-        .where(
-            LikeMovieModel.c.user_id == user_id, LikeMovieModel.c.movie_id == movie_id
-        )
-        .values(is_liked=is_liked)
+        update(table_name)
+        .where(table_name.c.user_id == user_id, table_name.c.movie_id == movie_id)
+        .values({table_field: value})
     )
     session.execute(stmt)
     session.commit()

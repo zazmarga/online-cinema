@@ -88,6 +88,8 @@ movie_detail_actions_schema_example = {
     },
     "is_favorite": True,  #  or None
     "is_liked": True,  #  or None
+    "remove_like_dislike": "yes",  # or None
+    "to_rate": 9,  # or None
 }
 
 movie_list_favorite_schema_example = {"movies": [movie_item_schema_example]}

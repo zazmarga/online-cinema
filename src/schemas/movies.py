@@ -204,6 +204,8 @@ class MovieDetailActionsSchema(BaseModel):
     movie: MovieListItemSchema
     is_favorite: Optional[bool] = None
     is_liked: Optional[bool] = None
+    remove_like_dislike: Optional[str] = None
+    to_rate: Optional[int] = None
 
     model_config = {
         "from_attributes": True,
