@@ -1,14 +1,22 @@
 import uuid
 from typing import Optional, List
 
-from fastapi import APIRouter, Query, Depends, HTTPException, status, Body
+from fastapi import (
+    APIRouter,
+    Query,
+    Depends,
+    HTTPException,
+    status,
+    Body,
+    BackgroundTasks,
+)
 from fastapi.exceptions import ResponseValidationError
 from fastapi_filter import FilterDepends
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
-from src.config.dependencies import get_jwt_auth_manager
+from src.config.dependencies import get_jwt_auth_manager, get_accounts_email_notificator
 from src.database.filters.movies import MovieFilter, normalize_search_list
 from src.database.models.accounts import UserGroupModel, UserModel, UserGroupEnum
 from src.database.models.movies import (
@@ -37,6 +45,7 @@ from src.database.services.movies import (
 )
 from src.database.session import get_db
 from src.exceptions.security import BaseSecurityError
+from src.notifications import EmailSenderInterface
 from src.schemas.accounts import MessageResponseSchema
 from src.schemas.movies import (
     MovieListResponseSchema,
@@ -1448,6 +1457,7 @@ def get_list_comments_for_movie(
     summary="Add like or reply to comment for movies by ID.",
     description=(
         "<h3>This endpoint allows to add like or reply to comment for movies by ID.</h3>"
+        "<p> After that,  owner of comment get email-notification.</p>"
     ),
     responses={
         400: {
@@ -1480,9 +1490,11 @@ def get_list_comments_for_movie(
 def add_reply_like_to_comment_for_movie(
     movie_id: int,
     comment_id: int,
+    background_tasks: BackgroundTasks,
     is_liked: Optional[bool] = None,
     reply_input: CommentInput = Body(..., example={"content": ""}),
     db: Session = Depends(get_db),
+    email_sender: EmailSenderInterface = Depends(get_accounts_email_notificator),
     token: str = Depends(get_token),
     jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
 ) -> MessageResponseSchema:
@@ -1493,8 +1505,12 @@ def add_reply_like_to_comment_for_movie(
     :type movie_id: int
     :param comment_id: The movie comment ID.
     :type comment_id: int
+    :param is_liked: For like or clear like the movie.
+    :type is_liked: bool
     :param reply_input: Content of the replay for comment.
     :type reply_input: CommentInput
+    :param email_sender: Email sender. For email notification about actions.
+    :type email_sender: EmailSenderInterface
     :param token: Token used to authenticate.
     :type token: str
     :param db: The SQLAlchemy database session (provided via dependency injection).
@@ -1523,7 +1539,6 @@ def add_reply_like_to_comment_for_movie(
         )
         .first()
     )
-    print(f"{owner_of_comment=}")
 
     if not owner_of_comment:
         raise HTTPException(
@@ -1555,7 +1570,6 @@ def add_reply_like_to_comment_for_movie(
                     )
                     db.execute(record_like)
                     db.commit()
-        # send email about like
 
         if reply_input.content:
             new_reply = ReplyModel(
@@ -1564,10 +1578,21 @@ def add_reply_like_to_comment_for_movie(
             db.add(new_reply)
             db.commit()
             db.refresh(new_reply)
-        #   send email about reply for comment to owner
 
     except IntegrityError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail="Invalid input data.")
+
+    user_owner_of_comment = (
+        db.query(UserModel).filter(UserModel.id == owner_of_comment.user_id).first()
+    )
+    comment_link = f"http://127.0.0.1:8000/movies/{movie_id}/comments/actions/?comment_id={comment_id}"
+    email_message = f"Your {comment_id=} for {movie_id=} has been liked or replied to by {user_id=}."
+    background_tasks.add_task(
+        email_sender.send_like_reply_notification_email,
+        str(user_owner_of_comment.email),
+        comment_link,
+        email_message,
+    )
 
     return MessageResponseSchema(message="The like/comment was added successfully.")
