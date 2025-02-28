@@ -1,7 +1,8 @@
 import uuid
 from typing import Optional, List
 
-from fastapi import APIRouter, Query, Depends, HTTPException, status, Form, Body
+from fastapi import APIRouter, Query, Depends, HTTPException, status, Body
+from fastapi.exceptions import ResponseValidationError
 from fastapi_filter import FilterDepends
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -24,6 +25,8 @@ from src.database.models.movies import (
     ConfirmationEnum,
     CommentModel,
     MoviesCommentsModel,
+    comment_likes,
+    ReplyModel,
 )
 from src.database.services.movies import (
     add_movie_to_table,
@@ -1320,7 +1323,7 @@ def get_list_favorite_movies(
 )
 def add_comment_to_movie(
     movie_id: int,
-    comment_input: CommentInput = Body(...),
+    comment_input: CommentInput = Body(..., example={"content": ""}),
     db: Session = Depends(get_db),
     token: str = Depends(get_token),
     jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
@@ -1347,23 +1350,28 @@ def add_comment_to_movie(
     except BaseSecurityError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
+    if not comment_input.content or not comment_input.content.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Content of the comment not be empty.",
+        )
+
     try:
-        if comment_input.content:
-            new_comment = CommentModel(content=comment_input.content, user_id=user_id)
-            db.add(new_comment)
-            db.flush()
+        new_comment = CommentModel(content=comment_input.content, user_id=user_id)
+        db.add(new_comment)
+        db.flush()
 
-            record = MoviesCommentsModel.insert().values(
-                user_id=user_id,
-                movie_id=movie_id,
-                comment_id=new_comment.id,
-            )
-            db.execute(record)
-            db.commit()
+        record = MoviesCommentsModel.insert().values(
+            user_id=user_id,
+            movie_id=movie_id,
+            comment_id=new_comment.id,
+        )
+        db.execute(record)
+        db.commit()
 
-            return MessageResponseSchema(message="The comment was added successfully.")
+        return MessageResponseSchema(message="The comment was added successfully.")
 
-    except IntegrityError:
+    except (IntegrityError, ResponseValidationError):
         db.rollback()
         raise HTTPException(status_code=400, detail="Invalid input data.")
 
@@ -1398,6 +1406,18 @@ def get_list_comments_for_movie(
     db: Session = Depends(get_db),
     token: str = Depends(get_token),
 ) -> CommentsMovieSchema:
+    """
+    Get list comments for movie by ID.
+
+    :param movie_id: The movie ID.
+    :type movie_id: int
+    :param token: Token used to authenticate.
+    :type token: str
+    :param db: The SQLAlchemy database session (provided via dependency injection).
+    :type db: Session
+
+    :return: CommentsMovieSchema
+    """
 
     if not token:
         raise HTTPException(
@@ -1407,12 +1427,10 @@ def get_list_comments_for_movie(
 
     comments = (
         db.query(CommentModel)
-        .select_from(CommentModel)
-        .join(MoviesCommentsModel, MoviesCommentsModel.c.movie_id == movie_id)
-        .join(MovieModel, MovieModel.id == MoviesCommentsModel.c.movie_id)
+        .join(MoviesCommentsModel, MoviesCommentsModel.c.comment_id == CommentModel.id)
+        .filter(MoviesCommentsModel.c.movie_id == movie_id)
         .all()
     )
-
     if not comments:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -1422,3 +1440,134 @@ def get_list_comments_for_movie(
     movie = db.query(MovieModel).get(movie_id)
 
     return CommentsMovieSchema(movie=movie, comments=comments)
+
+
+@router.post(
+    "/{movie_id}/comments/actions/",
+    response_model=MessageResponseSchema,
+    summary="Add like or reply to comment for movies by ID.",
+    description=(
+        "<h3>This endpoint allows to add like or reply to comment for movies by ID.</h3>"
+    ),
+    responses={
+        400: {
+            "description": "Bad request.",
+            "content": {
+                "application/json": {"example": {"detail": "Invalid input data."}}
+            },
+        },
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Authorization header is missing."}
+                }
+            },
+        },
+        404: {
+            "description": "No comment found.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Comment with comment_id does not exist for this movie."
+                    }
+                }
+            },
+        },
+    },
+    status_code=status.HTTP_201_CREATED,
+)
+def add_reply_like_to_comment_for_movie(
+    movie_id: int,
+    comment_id: int,
+    is_liked: Optional[bool] = None,
+    reply_input: CommentInput = Body(..., example={"content": ""}),
+    db: Session = Depends(get_db),
+    token: str = Depends(get_token),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+) -> MessageResponseSchema:
+    """
+    This endpoint allows to add comment to movie using it ID.
+
+    :param movie_id: The movie ID.
+    :type movie_id: int
+    :param comment_id: The movie comment ID.
+    :type comment_id: int
+    :param reply_input: Content of the replay for comment.
+    :type reply_input: CommentInput
+    :param token: Token used to authenticate.
+    :type token: str
+    :param db: The SQLAlchemy database session (provided via dependency injection).
+    :type db: Session
+    :param jwt_manager: The JWT manager used to authenticate.
+    :type jwt_manager: JWTAuthManagerInterface
+
+    :return: MessageResponseSchema
+    """
+    try:
+        payload = jwt_manager.decode_access_token(token)
+        user_id = payload.get("user_id")
+    except BaseSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    if not comment_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid input data."
+        )
+
+    owner_of_comment = (
+        db.query(MoviesCommentsModel.c.user_id)
+        .filter(
+            MoviesCommentsModel.c.comment_id == comment_id,
+            MoviesCommentsModel.c.movie_id == movie_id,
+        )
+        .first()
+    )
+    print(f"{owner_of_comment=}")
+
+    if not owner_of_comment:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Not found this comment.",
+        )
+
+    try:
+        if is_liked is not None:
+            existing_like = db.execute(
+                comment_likes.select().where(
+                    comment_likes.c.user_id == user_id,
+                    comment_likes.c.comment_id == comment_id,
+                )
+            ).fetchone()
+
+            if existing_like is None:
+                if is_liked is True:
+                    add_like = comment_likes.insert().values(
+                        user_id=user_id, comment_id=comment_id
+                    )
+                    db.execute(add_like)
+                    db.commit()
+            else:
+                if is_liked is False:
+                    record_like = comment_likes.delete().where(
+                        comment_likes.c.user_id == user_id,
+                        comment_likes.c.comment_id == comment_id,
+                    )
+                    db.execute(record_like)
+                    db.commit()
+        # send email about like
+
+        if reply_input.content:
+            new_reply = ReplyModel(
+                content=reply_input.content, comment_id=comment_id, user_id=user_id
+            )
+            db.add(new_reply)
+            db.commit()
+            db.refresh(new_reply)
+        #   send email about reply for comment to owner
+
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Invalid input data.")
+
+    return MessageResponseSchema(message="The like/comment was added successfully.")

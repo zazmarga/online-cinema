@@ -283,11 +283,12 @@ MoviesCommentsModel = Table(
         primary_key=True,
         nullable=False,
     ),
+    UniqueConstraint("movie_id", "comment_id", name="unique_comment_constraint"),
 )
 
 
-class ResponseModel(Base):
-    __tablename__ = "responses"
+class ReplyModel(Base):
+    __tablename__ = "replies"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     content: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -302,11 +303,11 @@ class ResponseModel(Base):
     )
 
     comment: Mapped["CommentModel"] = relationship(
-        "CommentModel", back_populates="responses"
+        "CommentModel", back_populates="replies"
     )
 
     def __repr__(self):
-        return f"<Response(content='{self.content}')>"
+        return f"<Reply(content='{self.content}')>"
 
 
 class CommentModel(Base):
@@ -321,8 +322,8 @@ class CommentModel(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    responses: Mapped[list["ResponseModel"]] = relationship(
-        "ResponseModel", back_populates="comment"
+    replies: Mapped[list["ReplyModel"]] = relationship(
+        "ReplyModel", back_populates="comment"
     )
 
     def __repr__(self):
@@ -344,5 +345,5 @@ comment_likes = Table(
         ForeignKey("users.id", ondelete="CASCADE"),
         primary_key=True,
     ),
-    UniqueConstraint("user_id", "comment_id", name="unique_movie_constraint"),
+    UniqueConstraint("user_id", "comment_id", name="unique_comment_constraint"),
 )

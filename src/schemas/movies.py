@@ -17,6 +17,7 @@ from src.schemas.examples.movies import (
     movie_stars_update_schema_example,
     movie_detail_actions_schema_example,
     movie_list_favorite_schema_example,
+    list_comments_schema_example,
 )
 
 
@@ -238,13 +239,13 @@ class MovieListFavoriteSchema(BaseModel):
 
 
 class CommentInput(BaseModel):
-    content: str
+    content: Optional[str] = None
 
 
 class CommentSchema(BaseModel):
     id: int
     user_id: int
-    content: str
+    content: Optional[str] = None
 
     model_config = {
         "from_attributes": True,
