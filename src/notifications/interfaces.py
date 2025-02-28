@@ -22,3 +22,9 @@ class EmailSenderInterface(ABC):
     @abstractmethod
     def send_password_reset_complete_email(self, email: str, login_link: str) -> None:
         pass
+
+    @abstractmethod
+    def send_like_reply_notification_email(
+        self, email: str, comment_link: str, message: str
+    ) -> None:
+        pass

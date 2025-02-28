@@ -23,6 +23,7 @@ class EmailSender(EmailSenderInterface):
         activation_restore_email_template_name: str,
         password_email_template_name: str,
         password_complete_email_template_name: str,
+        like_reply_notification_email_template_name: str,
     ):
         self._hostname = hostname
         self._port = port
@@ -39,6 +40,9 @@ class EmailSender(EmailSenderInterface):
         self._password_email_template_name = password_email_template_name
         self._password_complete_email_template_name = (
             password_complete_email_template_name
+        )
+        self._like_reply_notification_email_template_name = (
+            like_reply_notification_email_template_name
         )
 
         self._env = Environment(loader=FileSystemLoader(template_dir))
@@ -93,4 +97,17 @@ class EmailSender(EmailSenderInterface):
         html_content = template.render(email=email, login_link=login_link)
 
         subject = "Your Password Has Been Successfully Reset"
+        self._send_email(email, subject, html_content)
+
+    def send_like_reply_notification_email(
+        self, email: str, comment_link: str, message: str
+    ) -> None:
+        template = self._env.get_template(
+            self._like_reply_notification_email_template_name
+        )
+        html_content = template.render(
+            email=email, comment_link=comment_link, message=message
+        )
+
+        subject = "Your comment has been liked or replied"
         self._send_email(email, subject, html_content)
