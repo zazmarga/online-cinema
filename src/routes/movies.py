@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional, List
 
-from fastapi import APIRouter, Query, Depends, HTTPException, status
+from fastapi import APIRouter, Query, Depends, HTTPException, status, Form, Body
 from fastapi_filter import FilterDepends
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -22,6 +22,8 @@ from src.database.models.movies import (
     RatingEnum,
     RatingMovieModel,
     ConfirmationEnum,
+    CommentModel,
+    MoviesCommentsModel,
 )
 from src.database.services.movies import (
     add_movie_to_table,
@@ -32,6 +34,7 @@ from src.database.services.movies import (
 )
 from src.database.session import get_db
 from src.exceptions.security import BaseSecurityError
+from src.schemas.accounts import MessageResponseSchema
 from src.schemas.movies import (
     MovieListResponseSchema,
     MovieListItemSchema,
@@ -46,6 +49,8 @@ from src.schemas.movies import (
     MovieGenresSchema,
     MovieDetailActionsSchema,
     MovieListFavoriteSchema,
+    CommentInput,
+    CommentsMovieSchema,
 )
 from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
@@ -87,7 +92,10 @@ router = APIRouter()
 def get_movie_list(
     page: int = Query(1, ge=1, description="Page number (1-based index)"),
     per_page: int = Query(10, ge=1, le=20, description="Number of items per page"),
-    sort_by: Optional[str] = Query(None, description="Sorting movies by any attribute"),
+    sort_by: Optional[str] = Query(
+        None,
+        description="Sorting movies by any attribute (name, year, price, imdb, id)",
+    ),
     movie_filter: Optional[MovieFilter] = FilterDepends(MovieFilter),
     token: str = Depends(get_token),
     db: Session = Depends(get_db),
@@ -418,6 +426,10 @@ def actions_to_movie_by_id(
     :type is_favorite: bool
     :param is_liked: Whether the movie is liked or not.
     :type is_liked: bool
+    :param remove_like_dislike: Remove like or dislike for this movie.
+    :type remove_like_dislike: ConfirmationEnum
+    :param to_rate: To rate the movie: 1 to 10.
+    type to_rate: RatingEnum
     :param db: The SQLAlchemy database session (provided via dependency injection).
     :type db: Session
     :param token: Token used to authenticate.
@@ -527,7 +539,7 @@ def actions_to_movie_by_id(
 
 
 @router.post(
-    "/add-movie/",
+    "/",
     response_model=MovieDetailSchema,
     summary="Add a new movie",
     description=(
@@ -1163,7 +1175,7 @@ def update_movie_stars(
 
 
 @router.get(
-    "/by-genres/",
+    "/sort/by-genres/",
     response_model=List[MovieGenresSchema],
     status_code=status.HTTP_200_OK,
     summary="Get list of genres with count of movies",
@@ -1281,3 +1293,132 @@ def get_list_favorite_movies(
         raise HTTPException(status_code=404, detail="No favorite movies found.")
 
     return MovieListFavoriteSchema(movies=list_favorite_movies)
+
+
+@router.post(
+    "/{movie_id}/comments/add/",
+    response_model=MessageResponseSchema,
+    summary="Add comment to movies by ID.",
+    description=("<h3>This endpoint allows to add comment to movie using it ID.</h3>"),
+    responses={
+        400: {
+            "description": "Bad request.",
+            "content": {
+                "application/json": {"example": {"detail": "Invalid input data."}}
+            },
+        },
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Authorization header is missing."}
+                }
+            },
+        },
+    },
+    status_code=status.HTTP_201_CREATED,
+)
+def add_comment_to_movie(
+    movie_id: int,
+    comment_input: CommentInput = Body(...),
+    db: Session = Depends(get_db),
+    token: str = Depends(get_token),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+) -> MessageResponseSchema:
+    """
+    This endpoint allows to add comment to movie using it ID.
+
+    :param movie_id: The movie ID.
+    :type movie_id: int
+    :param comment_input: Content of the comment.
+    :type comment_input: CommentInput
+    :param token: Token used to authenticate.
+    :type token: str
+    :param db: The SQLAlchemy database session (provided via dependency injection).
+    :type db: Session
+    :param jwt_manager: The JWT manager used to authenticate.
+    :type jwt_manager: JWTAuthManagerInterface
+
+    :return: MessageResponseSchema
+    """
+    try:
+        payload = jwt_manager.decode_access_token(token)
+        user_id = payload.get("user_id")
+    except BaseSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    try:
+        if comment_input.content:
+            new_comment = CommentModel(content=comment_input.content, user_id=user_id)
+            db.add(new_comment)
+            db.flush()
+
+            record = MoviesCommentsModel.insert().values(
+                user_id=user_id,
+                movie_id=movie_id,
+                comment_id=new_comment.id,
+            )
+            db.execute(record)
+            db.commit()
+
+            return MessageResponseSchema(message="The comment was added successfully.")
+
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Invalid input data.")
+
+
+@router.get(
+    "/{movie_id}/comments/",
+    response_model=CommentsMovieSchema,
+    summary="Get list comments by movie ID.",
+    description=("<h3>This endpoint show all comments for movie by ID.</h3>"),
+    responses={
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Authorization header is missing."}
+                }
+            },
+        },
+        404: {
+            "description": "No comments found.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "This movie does not have comments yet."}
+                }
+            },
+        },
+    },
+    status_code=status.HTTP_200_OK,
+)
+def get_list_comments_for_movie(
+    movie_id: int,
+    db: Session = Depends(get_db),
+    token: str = Depends(get_token),
+) -> CommentsMovieSchema:
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header is missing.",
+        )
+
+    comments = (
+        db.query(CommentModel)
+        .select_from(CommentModel)
+        .join(MoviesCommentsModel, MoviesCommentsModel.c.movie_id == movie_id)
+        .join(MovieModel, MovieModel.id == MoviesCommentsModel.c.movie_id)
+        .all()
+    )
+
+    if not comments:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="This movie does not have comments yet.",
+        )
+
+    movie = db.query(MovieModel).get(movie_id)
+
+    return CommentsMovieSchema(movie=movie, comments=comments)

@@ -164,6 +164,11 @@ class MovieGenresUpdateSchema(BaseModel):
         "json_schema_extra": {"examples": [movie_genres_update_schema_example]},
     }
 
+    @field_validator("genres", mode="before")
+    @classmethod
+    def normalize_list_fields(cls, value: List[str]) -> List[str]:
+        return [item.title() for item in value]
+
 
 class MovieDirectorsUpdateSchema(BaseModel):
     directors: List[str] = Field(...)
@@ -173,6 +178,11 @@ class MovieDirectorsUpdateSchema(BaseModel):
         "json_schema_extra": {"examples": [movie_directors_update_schema_example]},
     }
 
+    @field_validator("directors", mode="before")
+    @classmethod
+    def normalize_list_fields(cls, value: List[str]) -> List[str]:
+        return [item.title() for item in value]
+
 
 class MovieStarsUpdateSchema(BaseModel):
     stars: List[str] = Field(...)
@@ -181,6 +191,11 @@ class MovieStarsUpdateSchema(BaseModel):
         "from_attributes": True,
         "json_schema_extra": {"examples": [movie_stars_update_schema_example]},
     }
+
+    @field_validator("stars", mode="before")
+    @classmethod
+    def normalize_list_fields(cls, value: List[str]) -> List[str]:
+        return [item.title() for item in value]
 
 
 class MovieSearchResponseSchema(BaseModel):
@@ -219,4 +234,28 @@ class MovieListFavoriteSchema(BaseModel):
     model_config = {
         "from_attributes": True,
         "json_schema_extra": {"examples": [movie_list_favorite_schema_example]},
+    }
+
+
+class CommentInput(BaseModel):
+    content: str
+
+
+class CommentSchema(BaseModel):
+    id: int
+    user_id: int
+    content: str
+
+    model_config = {
+        "from_attributes": True,
+    }
+
+
+class CommentsMovieSchema(BaseModel):
+    movie: MovieListItemSchema
+    comments: List[CommentSchema]
+
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {"examples": [list_comments_schema_example]},
     }

@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import Enum
 from typing import Optional
 
@@ -12,6 +13,8 @@ from sqlalchemy import (
     DECIMAL,
     UniqueConstraint,
     Boolean,
+    DateTime,
+    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -219,6 +222,7 @@ LikeMovieModel = Table(
 class ConfirmationEnum(str, Enum):
     yes = "yes"
 
+
 class RatingEnum(int, Enum):
     one = 1
     two = 2
@@ -254,3 +258,91 @@ RatingMovieModel = Table(
     UniqueConstraint("user_id", "movie_id", name="unique_movie_constraint"),
 )
 
+
+MoviesCommentsModel = Table(
+    "movie_comments",
+    Base.metadata,
+    Column(
+        "user_id",
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    ),
+    Column(
+        "movie_id",
+        Integer,
+        ForeignKey("movies.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    ),
+    Column(
+        "comment_id",
+        Integer,
+        ForeignKey("comments.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    ),
+)
+
+
+class ResponseModel(Base):
+    __tablename__ = "responses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    content: Mapped[str] = mapped_column(String(255), nullable=False)
+    comment_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("comments.id"), nullable=False
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    comment: Mapped["CommentModel"] = relationship(
+        "CommentModel", back_populates="responses"
+    )
+
+    def __repr__(self):
+        return f"<Response(content='{self.content}')>"
+
+
+class CommentModel(Base):
+    __tablename__ = "comments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    content: Mapped[str] = mapped_column(String(255), nullable=False)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    responses: Mapped[list["ResponseModel"]] = relationship(
+        "ResponseModel", back_populates="comment"
+    )
+
+    def __repr__(self):
+        return f"<Comment(content='{self.content}')>"
+
+
+comment_likes = Table(
+    "comment_likes",
+    Base.metadata,
+    Column(
+        "comment_id",
+        Integer,
+        ForeignKey("comments.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "user_id",
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    UniqueConstraint("user_id", "comment_id", name="unique_movie_constraint"),
+)

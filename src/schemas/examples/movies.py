@@ -93,3 +93,16 @@ movie_detail_actions_schema_example = {
 }
 
 movie_list_favorite_schema_example = {"movies": [movie_item_schema_example]}
+
+list_comments_schema_example = {
+    "movie": {
+        "id": 3,
+        "name": "Forrest Gump",
+        "year": 1994,
+        "time": 142,
+        "imdb": 8.8,
+        "description": "The history of the United States from the 1950s to the '70s unfolds from the perspective of an Alabama man with an IQ of 75, who yearns to be reunited with his childhood sweetheart.",
+        "price": 8.99,
+    },
+    "comments": [{"id": 2, "user_id": 1, "content": "I liked this movie!"}],
+}
