@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 
 class CartItemSchema(BaseModel):
+    movie_id: int
     name: str
     price: float
     genres: str

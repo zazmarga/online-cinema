@@ -1,12 +1,14 @@
-from typing import List
+from sqlite3 import IntegrityError
+from typing import List, Optional
 
-from fastapi import APIRouter, status, Depends, HTTPException
+from fastapi import APIRouter, status, Depends, HTTPException, Query
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from src.config.dependencies import get_jwt_auth_manager
 from src.database.models.accounts import UserGroupModel, UserModel, UserGroupEnum
 from src.database.models.carts import CartModel, CartItemModel, PurchasedMovieModel
-from src.database.models.movies import MovieModel
+from src.database.models.movies import MovieModel, ConfirmationEnum
 from src.database.session import get_db
 from src.exceptions.security import BaseSecurityError
 from src.schemas.accounts import MessageResponseSchema
@@ -113,21 +115,26 @@ def add_movie_to_user_cart(
             status_code=status.HTTP_409_CONFLICT,
             detail="Movie with this ID already is purchased by user. Repeat purchases are not allowed.",
         )
+    try:
+        user_cart = db.get(CartModel, current_user_id)
+        if not user_cart:
+            user_cart = CartModel(user_id=current_user_id)
+            db.add(user_cart)
+            db.flush()
 
-    user_cart = db.get(CartModel, current_user_id)
-    if not user_cart:
-        user_cart = CartModel(user_id=current_user_id)
-        db.add(user_cart)
-        db.flush()
+        item_to_cart = CartItemModel(cart_id=user_cart.id, movie_id=movie.id)
+        db.add(item_to_cart)
+        db.commit()
+        db.refresh(item_to_cart)
 
-    item_to_cart = CartItemModel(cart_id=user_cart.id, movie_id=movie.id)
-    db.add(item_to_cart)
-    db.commit()
-    db.refresh(item_to_cart)
+        return MessageResponseSchema(
+            message="The movie has been added to user cart successfully."
+        )
 
-    return MessageResponseSchema(
-        message="The movie has been added to user cart successfully."
-    )
+    except SQLAlchemyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )
 
 
 @router.get(
@@ -203,15 +210,134 @@ def get_user_cart(
         genres = ", ".join([genre.name for genre in movie.genres])
         cart_items.append(
             CartItemSchema(
-                name=movie.name, price=movie.price, genres=genres, year=movie.year
+                movie_id=movie.id,
+                name=movie.name,
+                price=movie.price,
+                genres=genres,
+                year=movie.year,
             )
         )
 
     return UserCartSchema(cart_items=cart_items)
 
 
+@router.post(
+    "/user-cart/update/",
+    response_model=MessageResponseSchema,
+    summary="Update user's cart",
+    description="This endpoint update current users cart: "
+    "remove movie by movie ID "
+    "or clear cart.",
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Authorization header is missing."}
+                }
+            },
+        },
+        404: {
+            "description": "Movie not found.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Movie with the given ID was not found in user's cart."
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Internal Server Error.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "An error occurred while updating the user cart."
+                    }
+                }
+            },
+        },
+    },
+)
+def update_user_cart(
+    movie_id: Optional[int] = Query(
+        None, description="Remove the movie from cart by movie ID. (ex.: movie_id: 3)"
+    ),
+    clear_cart: Optional[ConfirmationEnum] = Query(
+        None, description="Clear the cart? (ex.: clear_cart: yes)"
+    ),
+    token: str = Depends(get_token),
+    db: Session = Depends(get_db),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+) -> MessageResponseSchema:
+    """
+    This endpoint update current users cart:
+    remove a movie by movie ID or clear cart.
+
+    :param movie_id:
+    :param clear_cart: ConfirmationEnum or None, confirmation to clear cart (remove all movies).
+    :param token:
+    :param db:
+    :param jwt_manager:
+
+    :return: MessageResponseSchema
+    """
+    try:
+        payload = jwt_manager.decode_access_token(token)
+        current_user_id = payload.get("user_id")
+    except BaseSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    user_cart = db.get(CartModel, current_user_id)
+    if not user_cart:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Movie with the given ID was not found in user's cart.",
+        )
+    try:
+        if clear_cart:
+            db.query(CartItemModel).filter(
+                CartItemModel.cart_id == user_cart.id
+            ).delete()
+            db.commit()
+
+            return MessageResponseSchema(
+                message="User's cart has been cleared successfully."
+            )
+
+        if movie_id:
+            cart_item = (
+                db.query(CartItemModel)
+                .filter(
+                    CartItemModel.movie_id == movie_id,
+                    CartItemModel.cart_id == user_cart.id,
+                )
+                .first()
+            )
+
+            if not cart_item:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Movie with the given ID was not found in user's cart.",
+                )
+
+            db.delete(cart_item)
+            db.commit()
+            db.refresh(user_cart)
+
+            return MessageResponseSchema(
+                message="User's cart has been updated successfully."
+            )
+
+    except SQLAlchemyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )
+
+
 @router.get(
-    "/",
+    "/all/",
     response_model=List[CartListSchema],
     summary="Get all users carts",
     description="This endpoint shows all users cart with list movies in each cart. "
@@ -308,7 +434,11 @@ def get_list_carts(
             genres = ", ".join([genre.name for genre in movie.genres])
             cart_items.append(
                 CartItemSchema(
-                    name=movie.name, price=movie.price, genres=genres, year=movie.year
+                    movie_id=movie.id,
+                    name=movie.name,
+                    price=movie.price,
+                    genres=genres,
+                    year=movie.year,
                 )
             )
         list_carts.append(
