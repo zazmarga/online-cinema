@@ -79,6 +79,8 @@ class UserModel(Base):
         "PasswordResetTokenModel", back_populates="user", cascade="all, delete-orphan"
     )
 
+    cart = relationship("CartModel", back_populates="user", uselist=False)
+
     def __repr__(self):
         return (
             f"<UserModel(id={self.id}, email={self.email}, is_active={self.is_active})>"

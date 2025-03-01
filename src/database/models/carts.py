@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import ForeignKey, UniqueConstraint, DateTime, Table, Column
+from sqlalchemy import ForeignKey, UniqueConstraint, DateTime, Table, Column, Integer
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 from src.database.models.accounts import UserModel
@@ -18,6 +18,10 @@ class CartModel(Base):
 
     user: Mapped[UserModel] = relationship("UserModel", back_populates="cart")
 
+    cart_items = relationship(
+        "CartItemModel", back_populates="carts", cascade="all, delete-orphan"
+    )
+
     __table_args__ = (UniqueConstraint("user_id"),)
 
     def __repr__(self):
@@ -27,19 +31,19 @@ class CartModel(Base):
 class CartItemModel(Base):
     __tablename__ = "cart_items"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    cart_id: Mapped[int] = relationship(
-        ForeignKey("carts.id", ondelete="CASCADE"), nullable=False
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    cart_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("carts.id", ondelete="CASCADE"), nullable=False
     )
-    movie_id: Mapped[int] = relationship(
-        ForeignKey("movies.id", ondelete="CASCADE"), nullable=False
+    movie_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("movies.id", ondelete="CASCADE"), nullable=False
     )
     added_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.now(timezone.utc)
     )
 
-    carts = relationship(CartModel, back_populates="cart_items")
-    movies = relationship(MovieModel, back_populates="cart_items")
+    carts = relationship("CartModel", back_populates="cart_items")
+    movies = relationship("MovieModel", back_populates="cart_items")
 
     __table_args__ = (
         UniqueConstraint("cart_id", "movie_id", name="unique_movie_constraint"),
@@ -64,7 +68,5 @@ PurchasedMovieModel = Table(
         primary_key=True,
         nullable=False,
     ),
-    __table_args__=(
-        UniqueConstraint("user_id", "movie_id", name="unique_movie_constraint"),
-    ),
+    UniqueConstraint("user_id", "movie_id", name="unique_movie_constraint"),
 )

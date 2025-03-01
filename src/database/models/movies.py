@@ -161,6 +161,8 @@ class MovieModel(Base):
         "DirectorModel", secondary=DirectorsMoviesModel, back_populates="movies"
     )
 
+    cart_items = relationship("CartItemModel", back_populates="movies")
+
     __table_args__ = (
         UniqueConstraint("name", "year", "time", name="unique_movie_constraint"),
     )
