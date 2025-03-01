@@ -15,6 +15,9 @@ from src.schemas.examples.movies import (
     movie_genres_update_schema_example,
     movie_directors_update_schema_example,
     movie_stars_update_schema_example,
+    movie_detail_actions_schema_example,
+    movie_list_favorite_schema_example,
+    list_comments_schema_example,
 )
 
 
@@ -162,6 +165,11 @@ class MovieGenresUpdateSchema(BaseModel):
         "json_schema_extra": {"examples": [movie_genres_update_schema_example]},
     }
 
+    @field_validator("genres", mode="before")
+    @classmethod
+    def normalize_list_fields(cls, value: List[str]) -> List[str]:
+        return [item.title() for item in value]
+
 
 class MovieDirectorsUpdateSchema(BaseModel):
     directors: List[str] = Field(...)
@@ -171,6 +179,11 @@ class MovieDirectorsUpdateSchema(BaseModel):
         "json_schema_extra": {"examples": [movie_directors_update_schema_example]},
     }
 
+    @field_validator("directors", mode="before")
+    @classmethod
+    def normalize_list_fields(cls, value: List[str]) -> List[str]:
+        return [item.title() for item in value]
+
 
 class MovieStarsUpdateSchema(BaseModel):
     stars: List[str] = Field(...)
@@ -179,6 +192,11 @@ class MovieStarsUpdateSchema(BaseModel):
         "from_attributes": True,
         "json_schema_extra": {"examples": [movie_stars_update_schema_example]},
     }
+
+    @field_validator("stars", mode="before")
+    @classmethod
+    def normalize_list_fields(cls, value: List[str]) -> List[str]:
+        return [item.title() for item in value]
 
 
 class MovieSearchResponseSchema(BaseModel):
@@ -195,4 +213,50 @@ class MovieGenresSchema(BaseModel):
 
     model_config = {
         "from_attributes": True,
+    }
+
+
+class MovieDetailActionsSchema(BaseModel):
+    movie: MovieListItemSchema
+    is_favorite: Optional[bool] = None
+    is_liked: Optional[bool] = None
+    remove_like_dislike: Optional[str] = None
+    to_rate: Optional[int] = None
+
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {"examples": [movie_detail_actions_schema_example]},
+    }
+
+
+class MovieListFavoriteSchema(BaseModel):
+    movies: List[MovieListItemSchema]
+
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {"examples": [movie_list_favorite_schema_example]},
+    }
+
+
+class CommentInput(BaseModel):
+    content: Optional[str] = None
+
+
+class CommentSchema(BaseModel):
+    id: int
+    user_id: int
+    content: Optional[str] = None
+
+    model_config = {
+        "from_attributes": True,
+    }
+
+
+class CommentsMovieSchema(BaseModel):
+    movie: MovieListItemSchema
+    comments: List[CommentSchema]
+
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {"examples": [list_comments_schema_example]},
     }

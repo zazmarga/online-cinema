@@ -75,3 +75,34 @@ movie_directors_update_schema_example = {
 movie_stars_update_schema_example = {
     "stars": ["Marlon Brando", "Al Pacino", "James Caan"]
 }
+
+movie_detail_actions_schema_example = {
+    "movie": {
+        "id": 4,
+        "name": "Matrix",
+        "year": 1999,
+        "time": 136,
+        "imdb": 8.7,
+        "description": "When a beautiful stranger leads computer hacker Neo to a forbidding underworld, he discovers the shocking truth--the life he knows is the elaborate deception of an evil cyber-intelligence.",
+        "price": 14.99,
+    },
+    "is_favorite": True,  #  or None
+    "is_liked": True,  #  or None
+    "remove_like_dislike": "yes",  # or None
+    "to_rate": 9,  # or None
+}
+
+movie_list_favorite_schema_example = {"movies": [movie_item_schema_example]}
+
+list_comments_schema_example = {
+    "movie": {
+        "id": 3,
+        "name": "Forrest Gump",
+        "year": 1994,
+        "time": 142,
+        "imdb": 8.8,
+        "description": "The history of the United States from the 1950s to the '70s unfolds from the perspective of an Alabama man with an IQ of 75, who yearns to be reunited with his childhood sweetheart.",
+        "price": 8.99,
+    },
+    "comments": [{"id": 2, "user_id": 1, "content": "I liked this movie!"}],
+}
