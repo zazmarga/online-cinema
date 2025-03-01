@@ -10,3 +10,4 @@ class Base(DeclarativeBase):
 import src.database.models.accounts
 import src.database.models.movies
 import src.database.models.carts
+import src.database.models.orders
