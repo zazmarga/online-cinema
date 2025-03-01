@@ -1,6 +1,5 @@
 from fastapi import APIRouter, status, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy.testing.pickleable import User
 
 from src.config.dependencies import get_jwt_auth_manager
 from src.database.models.carts import CartModel, CartItemModel, PurchasedMovieModel
@@ -8,6 +7,7 @@ from src.database.models.movies import MovieModel
 from src.database.session import get_db
 from src.exceptions.security import BaseSecurityError
 from src.schemas.accounts import MessageResponseSchema
+from src.schemas.carts import UserCartSchema, CartItemSchema
 from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
 
@@ -108,7 +108,7 @@ def add_movie_to_user_cart(
     if existing_purchased_movie:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Movie with this ID already is purchased by user.",
+            detail="Movie with this ID already is purchased by user. Repeat purchases are not allowed.",
         )
 
     user_cart = db.get(CartModel, current_user_id)
@@ -125,3 +125,85 @@ def add_movie_to_user_cart(
     return MessageResponseSchema(
         message="The movie has been added to user cart successfully."
     )
+
+
+@router.get(
+    "/user-cart/",
+    response_model=UserCartSchema,
+    summary="Get list movies in user's cart",
+    description="This endpoint shows list movies in a cart of current user.",
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Authorization header is missing or Invalid token."
+                    }
+                }
+            },
+        },
+        404: {
+            "description": "Not found cart.",
+            "content": {
+                "application/json": {"example": {"detail": "User cart is empty."}}
+            },
+        },
+        500: {
+            "description": "Internal Server Error.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "An error occurred while updating the user cart."
+                    }
+                }
+            },
+        },
+    },
+)
+def get_user_cart(
+    token: str = Depends(get_token),
+    db: Session = Depends(get_db),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+) -> UserCartSchema:
+    """
+    Get list movies in user's cart.
+
+    :param token:
+    :param db:
+    :param jwt_manager:
+
+    :return: UserCartSchema
+    """
+    try:
+        payload = jwt_manager.decode_access_token(token)
+        current_user_id = payload.get("user_id")
+    except BaseSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    user_cart = db.get(CartModel, current_user_id)
+    if not user_cart:
+        user_cart = CartModel(user_id=current_user_id)
+        db.add(user_cart)
+        db.flush()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User cart is empty."
+        )
+
+    movies_in_cart = [item.movies for item in user_cart.cart_items]
+    if not movies_in_cart:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User cart is empty."
+        )
+
+    cart_items = []
+    for movie in movies_in_cart:
+        genres = ", ".join([genre.name for genre in movie.genres])
+        cart_items.append(
+            CartItemSchema(
+                name=movie.name, price=movie.price, genres=genres, year=movie.year
+            )
+        )
+
+    return UserCartSchema(cart_items=cart_items)
