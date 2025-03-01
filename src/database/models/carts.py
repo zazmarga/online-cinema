@@ -3,12 +3,12 @@ from datetime import datetime, timezone
 from sqlalchemy import ForeignKey, UniqueConstraint, DateTime, Table, Column, Integer
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 
-from src.database.models.accounts import UserModel
+
 from src.database.models.base import Base
-from src.database.models.movies import MovieModel
 
 
 class CartModel(Base):
+
     __tablename__ = "carts"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -16,7 +16,7 @@ class CartModel(Base):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True
     )
 
-    user: Mapped[UserModel] = relationship("UserModel", back_populates="cart")
+    user: Mapped["UserModel"] = relationship("UserModel", back_populates="cart")
 
     cart_items = relationship(
         "CartItemModel", back_populates="carts", cascade="all, delete-orphan"
