@@ -3,6 +3,7 @@ from os.path import exists
 from typing import cast
 
 from fastapi import APIRouter, status, BackgroundTasks, Depends, HTTPException
+from sqlalchemy import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -93,7 +94,17 @@ def register_user(
             status_code=409,
             detail=f"A user with this email {user_data.email} already exists.",
         )
+
     user_group = db.query(UserGroupModel).filter_by(name=UserGroupEnum.USER).first()
+
+    # if first time choose user_group
+    if not user_group:
+        groups = [{"name": group.value} for group in UserGroupEnum]
+        db.execute(insert(UserGroupModel).values(groups))
+        db.flush()
+        user_group = db.query(UserGroupModel).filter_by(name=UserGroupEnum.USER).first()
+        db.commit()
+
     try:
         new_user = UserModel.create(
             email=str(user_data.email),
