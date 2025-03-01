@@ -1,3 +1,5 @@
+from typing import List
+
 from pydantic import BaseModel
 
 
@@ -13,4 +15,12 @@ class CartItemSchema(BaseModel):
 
 
 class UserCartSchema(BaseModel):
-    cart_items: list[CartItemSchema]
+    cart_items: List[CartItemSchema]
+
+
+class CartListSchema(UserCartSchema):
+    user_id: int
+
+    model_config = {
+        "from_attributes": True,
+    }

@@ -1,13 +1,16 @@
+from typing import List
+
 from fastapi import APIRouter, status, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from src.config.dependencies import get_jwt_auth_manager
+from src.database.models.accounts import UserGroupModel, UserModel, UserGroupEnum
 from src.database.models.carts import CartModel, CartItemModel, PurchasedMovieModel
 from src.database.models.movies import MovieModel
 from src.database.session import get_db
 from src.exceptions.security import BaseSecurityError
 from src.schemas.accounts import MessageResponseSchema
-from src.schemas.carts import UserCartSchema, CartItemSchema
+from src.schemas.carts import UserCartSchema, CartItemSchema, CartListSchema
 from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
 
@@ -154,9 +157,7 @@ def add_movie_to_user_cart(
             "description": "Internal Server Error.",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "An error occurred while updating the user cart."
-                    }
+                    "example": {"detail": "An error occurred while get the user cart."}
                 }
             },
         },
@@ -207,3 +208,111 @@ def get_user_cart(
         )
 
     return UserCartSchema(cart_items=cart_items)
+
+
+@router.get(
+    "/",
+    response_model=List[CartListSchema],
+    summary="Get all users carts",
+    description="This endpoint shows all users cart with list movies in each cart. "
+    "Allowed only for ADMIN users.",
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Authorization header is missing or Invalid token."
+                    }
+                }
+            },
+        },
+        403: {
+            "description": "Forbidden.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "You don't have permission to do this operation."
+                    }
+                }
+            },
+        },
+        404: {
+            "description": "Not found any carts.",
+            "content": {
+                "application/json": {"example": {"detail": "Users carts not found."}}
+            },
+        },
+        500: {
+            "description": "Internal Server Error.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "An error occurred while get list of users carts."
+                    }
+                }
+            },
+        },
+    },
+)
+def get_list_carts(
+    token: str = Depends(get_token),
+    db: Session = Depends(get_db),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+) -> List[CartListSchema]:
+    """
+    Get list of users carts with list of movies in each user's cart.
+    Allowed only for ADMIN users.
+
+    :param token:
+    :param db:
+    :param jwt_manager:
+
+    :return: List[UserCartSchema]
+    """
+    try:
+        payload = jwt_manager.decode_access_token(token)
+        current_user_id = payload.get("user_id")
+    except BaseSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    user_group = (
+        db.query(UserGroupModel)
+        .join(UserModel)
+        .filter(UserModel.id == current_user_id)
+        .first()
+    )
+
+    if user_group.name != UserGroupEnum.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to do this operation.",
+        )
+
+    user_carts = db.query(CartModel).all()
+
+    if not user_carts:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Users carts not found."
+        )
+
+    list_carts = []
+
+    for user_cart in user_carts:
+
+        movies_in_cart = [item.movies for item in user_cart.cart_items]
+
+        cart_items = []
+        for movie in movies_in_cart:
+            genres = ", ".join([genre.name for genre in movie.genres])
+            cart_items.append(
+                CartItemSchema(
+                    name=movie.name, price=movie.price, genres=genres, year=movie.year
+                )
+            )
+        list_carts.append(
+            CartListSchema(user_id=user_cart.user_id, cart_items=cart_items)
+        )
+
+    return list_carts
