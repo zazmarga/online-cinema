@@ -81,6 +81,8 @@ class UserModel(Base):
 
     cart = relationship("CartModel", back_populates="user", uselist=False)
 
+    orders = relationship("Order", back_populates="user")
+
     def __repr__(self):
         return (
             f"<UserModel(id={self.id}, email={self.email}, is_active={self.is_active})>"
