@@ -11,6 +11,7 @@ from src.database.services.orders import movie_is_purchased, movie_in_other_orde
 from src.database.session import get_db
 from src.exceptions.security import BaseSecurityError
 from src.schemas.accounts import MessageResponseSchema
+from src.schemas.orders import OrderListSchema, OrderItemListSchema
 from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
 
@@ -50,9 +51,7 @@ router = APIRouter()
             "description": "Internal Server Error.",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "An error occurred while updating the user cart."
-                    }
+                    "example": {"detail": "An error occurred while creating the order."}
                 }
             },
         },
@@ -71,7 +70,7 @@ def add_new_order(
     If the price of any  movie has changed since it was added to the cart,
     it will be updated to the current price.
 
-    :return:
+    :return: MessageResponseSchema
     """
     try:
         payload = jwt_manager.decode_access_token(token)
@@ -141,3 +140,83 @@ def add_new_order(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
+
+
+@router.get(
+    "/user/all/",
+    response_model=OrderListSchema,
+    summary="Get list of all user's orders.",
+    description="This endpoint shows list of all user's orders.",
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Authorization header is missing or Invalid token."
+                    }
+                }
+            },
+        },
+        404: {
+            "description": "Not found.",
+            "content": {
+                "application/json": {"example": {"detail": "User's order not found."}}
+            },
+        },
+        500: {
+            "description": "Internal Server Error.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "An error occurred while getting users orders."
+                    }
+                }
+            },
+        },
+    },
+)
+def get_list_user_orders(
+    token: str = Depends(get_token),
+    db: Session = Depends(get_db),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+) -> OrderListSchema:
+    """
+    Get list of orders.
+    This endpoint shows list of all user's orders.
+
+    :return: OrderListSchema
+    """
+    try:
+        payload = jwt_manager.decode_access_token(token)
+        user_id = payload.get("user_id")
+    except BaseSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    orders = db.query(OrderModel).filter(OrderModel.user_id == user_id).all()
+
+    if not orders:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User's order not found."
+        )
+
+    response_orders = []
+    for order in orders:
+        order_items = (
+            db.query(OrderItemModel, MovieModel.name)
+            .join(MovieModel, OrderItemModel.movie_id == MovieModel.id)
+            .filter(OrderItemModel.order_id == order.id)
+        )
+        movies = [item.name for item in order_items]
+        response_orders.append(
+            OrderItemListSchema(
+                id=order.id,
+                date=order.created_at.strftime("%Y-%m-%d %H:%M"),
+                movies=movies,
+                total_amount=order.total_amount,
+                status=order.status,
+            )
+        )
+
+    return OrderListSchema(orders=response_orders)
