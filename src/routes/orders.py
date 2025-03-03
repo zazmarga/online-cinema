@@ -1,11 +1,13 @@
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi_filter import FilterDepends
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette import status
 
 from src.config.dependencies import get_jwt_auth_manager
+from src.database.filters.orders import OrderFilter
 from src.database.models.accounts import UserGroupModel, UserModel, UserGroupEnum
 from src.database.models.carts import CartModel, CartItemModel
 from src.database.models.movies import MovieModel
@@ -229,7 +231,11 @@ def get_list_user_orders(
     "/",
     response_model=List[OrderListFullSchema],
     summary="Get list of all orders.",
-    description="This endpoint shows list of all orders for of users. Allowed only for ADMIN users.",
+    description="<h3>This endpoint shows list of all orders for all users. Allowed only for ADMIN users. </h3>"
+    "<p>Optional:  Filtering orders by user_id/list(user_id), ex.: 2,3; <br>"
+    "by start date (inclusive), ex.: YYYY-MM-DD; <br>"
+    "by end date (inclusive), ex.: YYYY-MM-DD; <br>"
+    "by status, ex.: paid  (should be one of: 'pending', 'paid' or 'canceled').</p>",
     status_code=status.HTTP_200_OK,
     responses={
         401: {
@@ -269,6 +275,7 @@ def get_list_user_orders(
     },
 )
 def get_list_orders(
+    order_filter: Optional[OrderFilter] = FilterDepends(OrderFilter),
     token: str = Depends(get_token),
     db: Session = Depends(get_db),
     jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
@@ -276,7 +283,13 @@ def get_list_orders(
     """
     Get list of all orders.
     This endpoint shows list of all orders for all users. Allowed only for ADMIN users.
+    Optional:  Filtering orders
+    by user_id/list(user_id), ex.: 2,3;
+    by start date (inclusive), ex.: YYYY-MM-DD;
+    by end date (inclusive), ex.: YYYY-MM-DD;
+    by status, ex.: paid  (should be one of: 'pending', 'paid' or 'canceled').
 
+    :param order_filter: OrderFilter - filtering orders
     :return: List[OrderListFullSchema]
     """
     try:
@@ -295,7 +308,12 @@ def get_list_orders(
             detail="You don't have permission to do this operation.",
         )
 
-    orders = db.query(OrderModel).all()
+    query = db.query(OrderModel)
+
+    if order_filter:
+        query = order_filter.filter(query)
+
+    orders = query.all()
 
     if not orders:
         raise HTTPException(
