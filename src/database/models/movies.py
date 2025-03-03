@@ -167,7 +167,7 @@ class MovieModel(Base):
 
     cart_items = relationship("CartItemModel", back_populates="movies")
 
-    order_items = relationship("OrderItemModel", back_populates="movies")
+    order_items = relationship("OrderItemModel", back_populates="movie")
 
     __table_args__ = (
         UniqueConstraint("name", "year", "time", name="unique_movie_constraint"),

@@ -27,7 +27,7 @@ class OrderItemModel(Base):
 
     order = relationship("OrderModel", back_populates="order_items")
 
-    movie = relationship("MovieModel", back_populates="movies")
+    movie = relationship("MovieModel", back_populates="order_items")
 
 
 class OrderModel(Base):
@@ -40,8 +40,10 @@ class OrderModel(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.now(timezone.utc)
     )
-    status: Mapped[OrderStatusEnum] = mapped_column(nullable=False)
-    total_amount: Mapped[float] = mapped_column(DECIMAL(10, 2), nullable=False)
+    status: Mapped[OrderStatusEnum] = mapped_column(default="pending", nullable=False)
+    total_amount: Mapped[float] = mapped_column(
+        DECIMAL(10, 2), nullable=False, default=0
+    )
 
     user = relationship("UserModel", back_populates="orders")
     order_items = relationship("OrderItemModel", back_populates="order")

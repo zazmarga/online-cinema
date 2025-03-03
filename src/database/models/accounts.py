@@ -81,7 +81,7 @@ class UserModel(Base):
 
     cart = relationship("CartModel", back_populates="user", uselist=False)
 
-    orders = relationship("Order", back_populates="user")
+    orders = relationship("OrderModel", back_populates="user")
 
     def __repr__(self):
         return (

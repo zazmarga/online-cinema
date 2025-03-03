@@ -1,4 +1,3 @@
-from sqlite3 import IntegrityError
 from typing import List, Optional
 
 from fastapi import APIRouter, status, Depends, HTTPException, Query
