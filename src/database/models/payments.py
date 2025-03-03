@@ -5,6 +5,8 @@ from typing import Optional
 from sqlalchemy import ForeignKey, DateTime, DECIMAL, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from src.database.models.base import Base
+
 
 class PaymentStatusEnum(str, Enum):
     SUCCESSFUL = "successful"
