@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi_filter import FilterDepends
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -10,8 +10,8 @@ from src.config.dependencies import get_jwt_auth_manager
 from src.database.filters.orders import OrderFilter
 from src.database.models.accounts import UserGroupModel, UserModel, UserGroupEnum
 from src.database.models.carts import CartModel, CartItemModel
-from src.database.models.movies import MovieModel
-from src.database.models.orders import OrderModel, OrderItemModel
+from src.database.models.movies import MovieModel, ConfirmationEnum
+from src.database.models.orders import OrderModel, OrderItemModel, OrderStatusEnum
 from src.database.services.orders import movie_is_purchased, movie_in_other_orders
 from src.database.session import get_db
 from src.exceptions.security import BaseSecurityError
@@ -225,6 +225,98 @@ def get_list_user_orders(
         )
 
     return OrderListSchema(orders=response_orders)
+
+
+@router.post(
+    "/user/{order_id}/",
+    response_model=MessageResponseSchema,
+    summary="Confirming or canceling user orders.",
+    description="This endpoint allows to confirm or cancel user order by order ID.",
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Authorization header is missing or Invalid token."
+                    }
+                }
+            },
+        },
+        404: {
+            "description": "Not found.",
+            "content": {
+                "application/json": {"example": {"detail": "User's order not found."}}
+            },
+        },
+        500: {
+            "description": "Internal Server Error.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "An error occurred while actions with users orders."
+                    }
+                }
+            },
+        },
+    },
+)
+def action_with_user_orders(
+    order_id: int,
+    to_confirm: Optional[ConfirmationEnum] = Query(
+        None, description="Confirm the order? (ex.: to_confirm: yes)"
+    ),
+    to_cancel: Optional[ConfirmationEnum] = Query(
+        None, description="Cancel the order? (ex.: to_cancel:: yes)"
+    ),
+    token: str = Depends(get_token),
+    db: Session = Depends(get_db),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+) -> MessageResponseSchema:
+    """
+    Confirming or canceling user orders.
+    This endpoint allows to confirm or cancel user order by order ID.
+
+    :return: OrderListSchema
+    """
+    # try:
+    #     payload = jwt_manager.decode_access_token(token)
+    #     user_id = payload.get("user_id")
+    # except BaseSecurityError as e:
+    #     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    user_id = 1
+
+    order = (
+        db.query(OrderModel)
+        .filter(OrderModel.user_id == user_id, OrderModel.id == order_id)
+        .first()
+    )
+
+    if (
+        not order
+        or order.status == OrderStatusEnum.CANCELED
+        or order.status == OrderStatusEnum.PAID
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User's order with this ID not found or is already paid, or canceled.",
+        )
+
+    if to_confirm == to_cancel:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Bad request."
+        )
+
+    if to_cancel:
+        order.status = OrderStatusEnum.CANCELED
+        db.commit()
+
+        return MessageResponseSchema(message=f"Order has been cancelled successfully.")
+
+    if to_confirm:
+        # go to pay
+        return MessageResponseSchema(message=f"Order has been confirmed successfully.")
 
 
 @router.get(
