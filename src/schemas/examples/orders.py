@@ -5,3 +5,9 @@ order_list_schema_example = {
     "total_amount": 19.98,
     "status": "pending",
 }
+
+order_list_full_schema_example = {
+    "user_id": 1,
+    **order_list_schema_example
+}
+

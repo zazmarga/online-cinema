@@ -1,9 +1,12 @@
+from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette import status
 
 from src.config.dependencies import get_jwt_auth_manager
+from src.database.models.accounts import UserGroupModel, UserModel, UserGroupEnum
 from src.database.models.carts import CartModel, CartItemModel
 from src.database.models.movies import MovieModel
 from src.database.models.orders import OrderModel, OrderItemModel
@@ -11,7 +14,7 @@ from src.database.services.orders import movie_is_purchased, movie_in_other_orde
 from src.database.session import get_db
 from src.exceptions.security import BaseSecurityError
 from src.schemas.accounts import MessageResponseSchema
-from src.schemas.orders import OrderListSchema, OrderItemListSchema
+from src.schemas.orders import OrderListSchema, OrderItemListSchema, OrderListFullSchema
 from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
 
@@ -220,3 +223,102 @@ def get_list_user_orders(
         )
 
     return OrderListSchema(orders=response_orders)
+
+
+@router.get(
+    "/",
+    response_model=List[OrderListFullSchema],
+    summary="Get list of all orders.",
+    description="This endpoint shows list of all orders for of users. Allowed only for ADMIN users.",
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Authorization header is missing or Invalid token."
+                    }
+                }
+            },
+        },
+        403: {
+            "description": "Forbidden.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "You don't have permission to do this operation."
+                    }
+                }
+            },
+        },
+        404: {
+            "description": "Not found.",
+            "content": {
+                "application/json": {"example": {"detail": "User's order not found."}}
+            },
+        },
+        500: {
+            "description": "Internal Server Error.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "An error occurred while getting orders."}
+                }
+            },
+        },
+    },
+)
+def get_list_orders(
+    token: str = Depends(get_token),
+    db: Session = Depends(get_db),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+) -> List[OrderListFullSchema]:
+    """
+    Get list of all orders.
+    This endpoint shows list of all orders for all users. Allowed only for ADMIN users.
+
+    :return: List[OrderListFullSchema]
+    """
+    try:
+        payload = jwt_manager.decode_access_token(token)
+        user_id = payload.get("user_id")
+    except BaseSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    user_group = (
+        db.query(UserGroupModel).join(UserModel).filter(UserModel.id == user_id).first()
+    )
+
+    if user_group.name != UserGroupEnum.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to do this operation.",
+        )
+
+    orders = db.query(OrderModel).all()
+
+    if not orders:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Orders not found."
+        )
+
+    response_orders = []
+    for order in orders:
+        order_items = (
+            db.query(OrderItemModel, MovieModel.name)
+            .join(MovieModel, OrderItemModel.movie_id == MovieModel.id)
+            .filter(OrderItemModel.order_id == order.id)
+        )
+        movies = [item.name for item in order_items]
+        response_orders.append(
+            OrderListFullSchema(
+                id=order.id,
+                user_id=order.user_id,
+                date=order.created_at.strftime("%Y-%m-%d %H:%M"),
+                movies=movies,
+                total_amount=order.total_amount,
+                status=order.status,
+            )
+        )
+
+    return response_orders
