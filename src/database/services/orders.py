@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
 from src.database.models.carts import PurchasedMovieModel
-from src.database.models.orders import OrderItemModel, OrderModel
+from src.database.models.orders import OrderItemModel, OrderModel, OrderStatusEnum
 
 
 def movie_is_purchased(session: Session, user_id: int, movie_id: int) -> bool:
@@ -18,7 +18,11 @@ def movie_is_purchased(session: Session, user_id: int, movie_id: int) -> bool:
 
 def movie_in_other_orders(session: Session, user_id: int, movie_id: int) -> bool:
     user_orders_ids = (
-        session.query(OrderModel).filter(OrderModel.user_id == user_id).all()
+        session.query(OrderModel)
+        .filter(
+            OrderModel.user_id == user_id, OrderModel.status != OrderStatusEnum.CANCELED
+        )
+        .all()
     )
     user_orders_ids = [order.id for order in user_orders_ids]
 
