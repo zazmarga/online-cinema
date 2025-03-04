@@ -51,7 +51,9 @@ class PaymentModel(Base):
         nullable=False, default=PaymentStatusEnum.SUCCESSFUL
     )
     amount: Mapped[float] = mapped_column(DECIMAL(10, 2), nullable=False)
-    external_payment_id: Optional[str] = mapped_column(String(255), nullable=True)
+    external_payment_id: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True
+    )
 
     user = relationship("UserModel", back_populates="payments")
 

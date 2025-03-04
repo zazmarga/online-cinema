@@ -12,4 +12,3 @@ import src.database.models.movies
 import src.database.models.carts
 import src.database.models.orders
 import src.database.models.payments
-

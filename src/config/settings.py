@@ -3,6 +3,9 @@ import os
 from pydantic_settings import BaseSettings
 
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class BaseAppSettings(BaseSettings):
@@ -28,6 +31,10 @@ class BaseAppSettings(BaseSettings):
 
     CELERY_BROKER: str = os.getenv("CELERY_BROKER", "redis://localhost:6379/0")
     CELERY_BACKEND: str = os.getenv("CELERY_BACKEND", "redis://localhost:6379/0")
+
+    STRIPE_SECRET_KEY: str = os.getenv("STRIPE_SECRET_KEY")
+    STRIPE_PUBLISHABLE_KEY: str = os.getenv("STRIPE_PUBLISHABLE_KEY")
+    BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
 
 
 class Settings(BaseAppSettings):
