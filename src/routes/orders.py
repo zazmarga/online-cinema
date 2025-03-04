@@ -228,10 +228,10 @@ def get_list_user_orders(
 
 
 @router.post(
-    "/user/{order_id}/",
+    "/user/{order_id}/cancel/",
     response_model=MessageResponseSchema,
-    summary="Confirming or canceling user orders.",
-    description="This endpoint allows to confirm or cancel user order by order ID.",
+    summary="Canceling user orders.",
+    description="This endpoint allows to cancel user order by order ID.",
     status_code=status.HTTP_200_OK,
     responses={
         401: {
@@ -262,30 +262,26 @@ def get_list_user_orders(
         },
     },
 )
-def action_with_user_orders(
+def cancel_order(
     order_id: int,
-    to_confirm: Optional[ConfirmationEnum] = Query(
-        None, description="Confirm the order? (ex.: to_confirm: yes)"
-    ),
     to_cancel: Optional[ConfirmationEnum] = Query(
         None, description="Cancel the order? (ex.: to_cancel:: yes)"
     ),
     token: str = Depends(get_token),
     db: Session = Depends(get_db),
     jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
-) -> MessageResponseSchema:
+) -> MessageResponseSchema | None:
     """
-    Confirming or canceling user orders.
-    This endpoint allows to confirm or cancel user order by order ID.
+    Canceling user orders.
+    This endpoint allows to cancel user order by order ID.
 
     :return: OrderListSchema
     """
-    # try:
-    #     payload = jwt_manager.decode_access_token(token)
-    #     user_id = payload.get("user_id")
-    # except BaseSecurityError as e:
-    #     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
-    user_id = 1
+    try:
+        payload = jwt_manager.decode_access_token(token)
+        user_id = payload.get("user_id")
+    except BaseSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
     order = (
         db.query(OrderModel)
@@ -303,20 +299,23 @@ def action_with_user_orders(
             detail="User's order with this ID not found or is already paid, or canceled.",
         )
 
-    if to_confirm == to_cancel:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Bad request."
-        )
-
     if to_cancel:
-        order.status = OrderStatusEnum.CANCELED
-        db.commit()
+        try:
+            if order.status == OrderStatusEnum.PENDING:
+                order.status = OrderStatusEnum.CANCELED
+                db.commit()
+            elif order.status == OrderStatusEnum.PAID:
+                return MessageResponseSchema(
+                    message="This order has already been paid for, you can cancel it through the return procedure."
+                )
+            return MessageResponseSchema(
+                message="Order has been cancelled successfully."
+            )
 
-        return MessageResponseSchema(message=f"Order has been cancelled successfully.")
-
-    if to_confirm:
-        # go to pay
-        return MessageResponseSchema(message=f"Order has been confirmed successfully.")
+        except SQLAlchemyError as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+            )
 
 
 @router.get(
