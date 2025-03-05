@@ -857,7 +857,7 @@ def update_user(
                     detail="Group with the given name was not found.",
                 )
             user.group_id = new_group.id
-        if exists(data.is_active) and data.is_active != user.is_active:
+        if data.is_active is not None and data.is_active != user.is_active:
             user.is_active = data.is_active
         db.add(user)
         db.commit()

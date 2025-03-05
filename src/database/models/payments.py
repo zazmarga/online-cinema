@@ -28,7 +28,7 @@ class PaymentItemModel(Base):
 
     payment = relationship("PaymentModel", back_populates="payment_items")
 
-    order_item = relationship("OrderItemModel", back_populates="order_items")
+    order_item = relationship("OrderItemModel", back_populates="payment_item")
 
     def __repr__(self) -> str:
         return f"PaymentItem(id={self.id}, payment_id={self.payment_id})"
@@ -42,7 +42,7 @@ class PaymentModel(Base):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     order_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("orders.id", ondelete="CASCADE"), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.now(timezone.utc)

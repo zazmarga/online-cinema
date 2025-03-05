@@ -83,6 +83,8 @@ class UserModel(Base):
 
     orders = relationship("OrderModel", back_populates="user")
 
+    payments = relationship("PaymentModel", back_populates="user")
+
     def __repr__(self):
         return (
             f"<UserModel(id={self.id}, email={self.email}, is_active={self.is_active})>"

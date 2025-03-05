@@ -15,7 +15,6 @@ class OrderStatusEnum(str, Enum):
 
 class OrderItemModel(Base):
     __tablename__ = "order_items"
-
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     order_id: Mapped[int] = mapped_column(
         ForeignKey("orders.id", ondelete="CASCADE"), nullable=False
@@ -26,13 +25,16 @@ class OrderItemModel(Base):
     price_at_order: Mapped[float] = mapped_column(DECIMAL(10, 2), nullable=False)
 
     order = relationship("OrderModel", back_populates="order_items")
-
     movie = relationship("MovieModel", back_populates="order_items")
+    payment_item = relationship(
+        "PaymentItemModel",
+        back_populates="order_item",
+        primaryjoin="OrderItemModel.id == PaymentItemModel.order_item_id",
+    )
 
 
 class OrderModel(Base):
     __tablename__ = "orders"
-
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
@@ -46,7 +48,10 @@ class OrderModel(Base):
     )
 
     user = relationship("UserModel", back_populates="orders")
-    order_items = relationship("OrderItemModel", back_populates="order")
+    order_items = relationship(
+        "OrderItemModel", back_populates="order", cascade="all, delete-orphan"
+    )
+    payment = relationship("PaymentModel", back_populates="order")
 
     def __repr__(self):
         return f"<Order(id={self.id}, user_id={self.user_id}, status={self.status})>"
