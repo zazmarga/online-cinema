@@ -1,4 +1,5 @@
 import os
+from typing import List, Optional
 
 import stripe
 from fastapi import (
@@ -10,9 +11,11 @@ from fastapi import (
     BackgroundTasks,
 )
 from fastapi.responses import RedirectResponse
+from fastapi_filter import FilterDepends
 from sqlalchemy import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+from sqlalchemy.testing.pickleable import User
 
 from src.config.settings import BaseAppSettings
 from src.config.dependencies import (
@@ -20,6 +23,7 @@ from src.config.dependencies import (
     get_jwt_auth_manager,
     get_accounts_email_notificator,
 )
+from src.database.filters.payments import PaymentFilter
 from src.database.models import UserModel
 from src.database.models.carts import PurchasedMovieModel
 from src.database.models.orders import OrderModel, OrderStatusEnum
@@ -29,7 +33,7 @@ from src.database.session import get_db
 from src.exceptions.security import BaseSecurityError
 from src.notifications import EmailSenderInterface
 from src.schemas.accounts import MessageResponseSchema
-from src.schemas.payments import PaymentListSchema, PaymentItemListSchema
+from src.schemas.payments import PaymentListSchema, PaymentItemListSchema, PaymentListFullSchema
 from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
 
@@ -290,3 +294,104 @@ def get_list_user_payments(
 
     return PaymentListSchema(payments=response_payments)
 
+
+@router.get(
+    "/",
+    response_model=List[PaymentListFullSchema],
+    summary="Get list of all payments.",
+    description="<h3>This endpoint shows list of all payments for all users. Allowed only for ADMIN users. </h3>"
+                "<p>Optional:  Filtering payments by user_id/list(user_id), ex.: 2,3; <br>"
+                "by start date (inclusive), ex.: YYYY-MM-DD; <br>"
+                "by end date (inclusive), ex.: YYYY-MM-DD; <br>"
+                "by status, ex.: successful  (should be one of: 'successful', 'refunded' or 'canceled').</p>",
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Authorization header is missing or Invalid token."
+                    }
+                }
+            },
+        },
+        403: {
+            "description": "Forbidden.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "You don't have permission to do this operation."
+                    }
+                }
+            },
+        },
+        404: {
+            "description": "Not found.",
+            "content": {
+                "application/json": {"example": {"detail": "Users payments not found."}}
+            },
+        },
+        500: {
+            "description": "Internal Server Error.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "An error occurred while getting orders."}
+                }
+            },
+        },
+    },
+)
+def get_list_payments(
+    payment_filter: Optional[PaymentFilter] = FilterDepends(PaymentFilter),
+    token: str = Depends(get_token),
+    db: Session = Depends(get_db),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+) -> List[PaymentListFullSchema]:
+    """
+    Get list of all payments.
+    This endpoint shows list of all payments for all users. Allowed only for ADMIN users.
+    Optional:  Filtering payments
+    by user_id/list(user_id), ex.: 2,3;
+    by start date (inclusive), ex.: YYYY-MM-DD;
+    by end date (inclusive), ex.: YYYY-MM-DD;
+    by status, ex.: successful  (should be one of: 'successful', 'refunded' or 'canceled').
+
+    :param payment_filter: PaymentFilter - filtering payments
+    :return: List[PaymentListFullSchema]
+    """
+    try:
+        payload = jwt_manager.decode_access_token(token)
+        user_id = payload.get("user_id")
+    except BaseSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    user = db.query(UserModel).filter(UserModel.id == user_id).first()
+
+    if not user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have permission to do this operation.")
+
+    query = db.query(PaymentModel)
+
+    if payment_filter:
+        query = payment_filter.filter(query)
+
+    payments = query.all()
+
+    if not payments:
+        raise HTTPException(status_code=404, detail="User's payments not found.")
+
+    response_payments = []
+
+    for payment in payments:
+        response_payments.append(
+            PaymentListFullSchema(
+                id=payment.id,
+                user_id=payment.user_id,
+                date=payment.created_at.strftime("%Y-%m-%d %H:%M"),
+                amount=payment.amount,
+                status=payment.status,
+            )
+        )
+
+    return response_payments
