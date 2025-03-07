@@ -787,7 +787,7 @@ def delete_movie(
 
     user = db.query(UserModel).filter(UserModel.id == user_id).first()
 
-    if not user.is_admin or not user.is_moderator:
+    if not user.is_admin and not user.is_moderator:
         raise HTTPException(status_code=403, detail="You don't have permission to do this operation.")
 
     movie = db.query(MovieModel).filter(MovieModel.id == movie_id).first()
