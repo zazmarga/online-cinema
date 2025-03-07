@@ -12,13 +12,14 @@ from fastapi import (
 )
 from fastapi.exceptions import ResponseValidationError
 from fastapi_filter import FilterDepends
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from src.config.dependencies import get_jwt_auth_manager, get_accounts_email_notificator
 from src.database.filters.movies import MovieFilter, normalize_search_list
 from src.database.models.accounts import UserGroupModel, UserModel, UserGroupEnum
+from src.database.models.carts import PurchasedMovieModel, CartItemModel
 from src.database.models.movies import (
     MovieModel,
     CertificationModel,
@@ -712,6 +713,103 @@ def create_movie(
         print("ERROR: ", e)
         db.rollback()
         raise HTTPException(status_code=400, detail="Invalid input data.")
+
+
+@router.delete(
+    "/{movie_id}/",
+    summary="Delete a movie by ID",
+    description=(
+        "<h3>Delete a specific movie from the database by its unique ID.</h3>"
+        "<p>If it does not exist, a 404 error will be returned. "
+        "If the movie exists, but if at least one user has purchased this movie or "
+        "a movie is in users' carts, it can not be deleted, another case it can be deleted.</p>"
+        "<p>Allowed only for admins and moderators. "
+    ),
+    responses={
+        204: {
+            "description": "Movie deleted successfully."
+        },
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {"example": {"detail": "User unauthorized."}}
+            },
+        },
+        403: {
+            "description": "Forbidden.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "You don't have permission to do this operation."
+                    }
+                }
+            },
+        },
+        404: {
+            "description": "Movie not found.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Movie with the given ID was not found."}
+                }
+            },
+        },
+    },
+    status_code=204
+)
+def delete_movie(
+    movie_id: int,
+    db: Session = Depends(get_db),
+    token: str = Depends(get_token),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+):
+    """
+    Delete a specific movie from the database by its unique ID.
+
+    If it does not exist, a 404 error will be returned.
+    If the movie exists, but if at least one user has purchased this movie or
+    a movie is in users' carts, it can not be deleted, another case it can be deleted.
+    Allowed only for admins and moderators.
+
+    :param movie_id: The unique identifier of the movie to delete.
+    :type movie_id: int
+    :param db: The SQLAlchemy database session (provided via dependency injection).
+    :type db: Session
+    :param token: The token used to authenticate.
+    :param jwt_manager: The JWT manager used to authenticate.
+
+    :return: A response indicating the successful deletion of the movie.
+    """
+    try:
+        payload = jwt_manager.decode_access_token(token)
+        user_id = payload.get("user_id")
+    except BaseSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    user = db.query(UserModel).filter(UserModel.id == user_id).first()
+
+    if not user.is_admin or not user.is_moderator:
+        raise HTTPException(status_code=403, detail="You don't have permission to do this operation.")
+
+    movie = db.query(MovieModel).filter(MovieModel.id == movie_id).first()
+
+    if not movie:
+        raise HTTPException(
+            status_code=404,
+            detail="Movie with the given ID was not found."
+        )
+
+    stmt = select(PurchasedMovieModel).where(PurchasedMovieModel.c.movie_id == movie_id)
+    result = db.execute(stmt).fetchall()
+    if len(result) > 0:
+        raise HTTPException(status_code=403, detail="You don't have permission to do this operation. At least one user has purchased this movie.")
+
+    cart_items = db.query(CartItemModel).filter(CartItemModel.movie_id == movie_id).all()
+    if len(cart_items) > 0:
+        raise HTTPException(status_code=403, detail="You don't have permission to do this operation. This movie is in at least one user's cart.")
+
+    db.delete(movie)
+    db.commit()
+    return {"detail": "Movie deleted successfully."}
 
 
 @router.patch(
