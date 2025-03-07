@@ -29,6 +29,7 @@ from src.database.session import get_db
 from src.exceptions.security import BaseSecurityError
 from src.notifications import EmailSenderInterface
 from src.schemas.accounts import MessageResponseSchema
+from src.schemas.payments import PaymentListSchema, PaymentItemListSchema
 from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
 
@@ -52,9 +53,9 @@ def cancel_page():
 async def confirm_order_and_create_checkout_session(
     order_id: int,
     settings: BaseAppSettings = Depends(get_settings),
-    # token: str = Depends(get_token),
+    token: str = Depends(get_token),
     db: Session = Depends(get_db),
-    # jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
 ) -> RedirectResponse or MessageResponseSchema:
     """
     Confirm user order. Create checkout session.
@@ -63,12 +64,11 @@ async def confirm_order_and_create_checkout_session(
     :return: RedirectResponse
     """
 
-    # try:
-    #     payload = jwt_manager.decode_access_token(token)
-    #     user_id = payload.get("user_id")
-    # except BaseSecurityError as e:
-    #     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
-    user_id = 1
+    try:
+        payload = jwt_manager.decode_access_token(token)
+        user_id = payload.get("user_id")
+    except BaseSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
     user = db.query(UserModel).filter(UserModel.id == user_id).first()
 
@@ -134,8 +134,11 @@ async def stripe_webhook(
     Sends an email to the user informing them of a successful payment.
 
     :param request:
+    :param background_tasks:
     :param settings:
     :param db:
+    :param email_sender:
+
     :return:
     """
     # get payload
@@ -214,3 +217,76 @@ async def stripe_webhook(
         except SQLAlchemyError as e:
             raise HTTPException(status_code=500, detail=str(e))
     return {}
+
+
+@router.get(
+    "/user/all/",
+    response_model=PaymentListSchema,
+    summary="Get list of all user's payments.",
+    description="This endpoint shows list of all user's payments.",
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {
+            "description": "Unauthorized.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Authorization header is missing or Invalid token."
+                    }
+                }
+            },
+        },
+        404: {
+            "description": "Not found.",
+            "content": {
+                "application/json": {"example": {"detail": "User's payments not found."}}
+            },
+        },
+        500: {
+            "description": "Internal Server Error.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "An error occurred while getting users orders."
+                    }
+                }
+            },
+        },
+    },
+)
+def get_list_user_payments(
+    token: str = Depends(get_token),
+    db: Session = Depends(get_db),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+) -> PaymentListSchema:
+    """
+    Get list of payments.
+    This endpoint shows list of all user's payments.
+
+    :return: PaymentListSchema
+    """
+    try:
+        payload = jwt_manager.decode_access_token(token)
+        user_id = payload.get("user_id")
+    except BaseSecurityError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    payments = db.query(PaymentModel).filter(PaymentModel.user_id == user_id).all()
+
+    if not payments:
+        raise HTTPException(status_code=404, detail="User's payments not found.")
+
+    response_payments = []
+
+    for payment in payments:
+        response_payments.append(
+            PaymentItemListSchema(
+                id=payment.id,
+                date=payment.created_at.strftime("%Y-%m-%d %H:%M"),
+                amount=payment.amount,
+                status=payment.status
+            )
+        )
+
+    return PaymentListSchema(payments=response_payments)
+
