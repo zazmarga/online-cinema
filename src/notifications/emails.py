@@ -24,6 +24,7 @@ class EmailSender(EmailSenderInterface):
         password_email_template_name: str,
         password_complete_email_template_name: str,
         like_reply_notification_email_template_name: str,
+        payment_confirmation_email_template_name: str,
     ):
         self._hostname = hostname
         self._port = port
@@ -43,6 +44,9 @@ class EmailSender(EmailSenderInterface):
         )
         self._like_reply_notification_email_template_name = (
             like_reply_notification_email_template_name
+        )
+        self._payment_confirmation_email_template_name = (
+            payment_confirmation_email_template_name
         )
 
         self._env = Environment(loader=FileSystemLoader(template_dir))
@@ -110,4 +114,17 @@ class EmailSender(EmailSenderInterface):
         )
 
         subject = "Your comment has been liked or replied"
+        self._send_email(email, subject, html_content)
+
+    def send_payment_confirmation_email(
+        self, email: str, payments_link: str, message: str
+    ) -> None:
+        template = self._env.get_template(
+            self._payment_confirmation_email_template_name
+        )
+        html_content = template.render(
+            email=email, payments_link=payments_link, message=message
+        )
+
+        subject = "Your payment has been received"
         self._send_email(email, subject, html_content)

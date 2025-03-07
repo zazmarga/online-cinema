@@ -7,6 +7,7 @@ from fastapi import (
     HTTPException,
     Depends,
     status,
+    BackgroundTasks,
 )
 from fastapi.responses import RedirectResponse
 from sqlalchemy import insert
@@ -14,7 +15,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from src.config.settings import BaseAppSettings
-from src.config.dependencies import get_settings, get_jwt_auth_manager
+from src.config.dependencies import (
+    get_settings,
+    get_jwt_auth_manager,
+    get_accounts_email_notificator,
+)
 from src.database.models import UserModel
 from src.database.models.carts import PurchasedMovieModel
 from src.database.models.orders import OrderModel, OrderStatusEnum
@@ -22,6 +27,7 @@ from src.database.models.payments import PaymentModel, PaymentItemModel
 from src.database.services.payments import check_prices_of_order_items
 from src.database.session import get_db
 from src.exceptions.security import BaseSecurityError
+from src.notifications import EmailSenderInterface
 from src.schemas.accounts import MessageResponseSchema
 from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
@@ -116,8 +122,10 @@ async def confirm_order_and_create_checkout_session(
 @router.post("/webhook/")
 async def stripe_webhook(
     request: Request,
+    background_tasks: BackgroundTasks,
     settings: BaseAppSettings = Depends(get_settings),
     db: Session = Depends(get_db),
+    email_sender: EmailSenderInterface = Depends(get_accounts_email_notificator),
 ):
     """
     This endpoint is used to check transactions via webhooks provided by the payment system.
@@ -191,10 +199,17 @@ async def stripe_webhook(
             db.commit()
             db.refresh(new_payment)
 
-            # send email about successful payment
-            # send_email_background_task(user_email, order_id)
-            print(f"{user_email=}")
-            print(f"{user_name=}")
+            # send email: payment confirmation
+            payments_link = "http://127.0.0.1:8000/payments/user/all/"
+            email_message = (
+                f"Payment in the amount of ${amount} was received from {user_name}."
+            )
+            background_tasks.add_task(
+                email_sender.send_payment_confirmation_email,
+                str(user_email),
+                payments_link,
+                email_message,
+            )
 
         except SQLAlchemyError as e:
             raise HTTPException(status_code=500, detail=str(e))

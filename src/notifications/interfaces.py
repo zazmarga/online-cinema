@@ -28,3 +28,9 @@ class EmailSenderInterface(ABC):
         self, email: str, comment_link: str, message: str
     ) -> None:
         pass
+
+    @abstractmethod
+    def send_payment_confirmation_email(
+        self, email: str, payments_link: str, message: str
+    ) -> None:
+        pass

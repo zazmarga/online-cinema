@@ -3,9 +3,6 @@ import os
 from pydantic_settings import BaseSettings
 
 from pathlib import Path
-from dotenv import load_dotenv
-
-load_dotenv()
 
 
 class BaseAppSettings(BaseSettings):
@@ -19,6 +16,7 @@ class BaseAppSettings(BaseSettings):
     PASSWORD_RESET_TEMPLATE_NAME: str = "password_reset_request.html"
     PASSWORD_RESET_COMPLETE_TEMPLATE_NAME: str = "password_reset_complete.html"
     LIKE_REPLY_NOTIFICATION_EMAIL_TEMPLATE_NAME: str = "like_reply_notification.html"
+    PAYMENT_CONFIRMATION_TEMPLATE_NAME: str = "payment_confirmation.html"
 
     EMAIL_HOST: str = os.getenv("EMAIL_HOST", "localhost")
     EMAIL_PORT: int = int(os.getenv("EMAIL_PORT", 1025))
@@ -32,9 +30,19 @@ class BaseAppSettings(BaseSettings):
     CELERY_BROKER: str = os.getenv("CELERY_BROKER", "redis://localhost:6379/0")
     CELERY_BACKEND: str = os.getenv("CELERY_BACKEND", "redis://localhost:6379/0")
 
-    STRIPE_SECRET_KEY: str = os.getenv("STRIPE_SECRET_KEY")
-    STRIPE_PUBLISHABLE_KEY: str = os.getenv("STRIPE_PUBLISHABLE_KEY")
-    BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
+    STRIPE_SECRET_KEY: str = os.getenv(
+        "STRIPE_SECRET_KEY",
+        "sk_test",
+    )
+    STRIPE_PUBLISHABLE_KEY: str = os.getenv(
+        "STRIPE_PUBLISHABLE_KEY",
+        "pk_test",
+    )
+    BASE_URL: str = os.getenv("BASE_URL", "http://127.0.0.1:4242")
+    WEBHOOK_SECRET: str = os.getenv(
+        "WEBHOOK_SECRET",
+        "whsec",
+    )
 
 
 class Settings(BaseAppSettings):
