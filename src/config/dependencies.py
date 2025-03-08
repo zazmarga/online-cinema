@@ -4,6 +4,7 @@ from src.config.settings import Settings, BaseAppSettings
 from src.notifications import EmailSenderInterface, EmailSender
 from src.security.interfaces import JWTAuthManagerInterface
 from src.security.token_manager import JWTAuthManager
+from src.storages import S3StorageInterface, S3StorageClient
 
 
 def get_settings() -> BaseAppSettings:
@@ -35,4 +36,15 @@ def get_jwt_auth_manager(
         secret_key_access=settings.SECRET_KEY_ACCESS,
         secret_key_refresh=settings.SECRET_KEY_REFRESH,
         algorithm=settings.JWT_SIGNING_ALGORITHM,
+    )
+
+
+def get_s3_storage_client(
+    settings: BaseAppSettings = Depends(get_settings),
+) -> S3StorageInterface:
+    return S3StorageClient(
+        endpoint_url=settings.S3_STORAGE_ENDPOINT,
+        access_key=settings.S3_STORAGE_ACCESS_KEY,
+        secret_key=settings.S3_STORAGE_SECRET_KEY,
+        bucket_name=settings.S3_BUCKET_NAME,
     )
