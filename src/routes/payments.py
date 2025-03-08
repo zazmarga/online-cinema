@@ -87,6 +87,11 @@ async def confirm_order_and_create_checkout_session(
             detail="User's order with this ID not found.",
         )
 
+    if order.status == OrderStatusEnum.PAID or order.status == OrderStatusEnum.CANCELED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Payment was paid or canceled."
+        )
+
     #  Check prices of order_items (maybe its were changed)
     total_amount = check_prices_of_order_items(db, order_id)
 
@@ -153,17 +158,59 @@ async def stripe_webhook(
     stripe.api_key = settings.STRIPE_SECRET_KEY
     webhook_secret = settings.WEBHOOK_SECRET
 
-    # check Signature
+    # # check Signature
+    # try:
+    #     event = stripe.Webhook.construct_event(
+    #         payload, signature_header, webhook_secret
+    #     )
+    #     print("Webhook verified!")
+    # except stripe.error.SignatureVerificationError:
+    #     raise HTTPException(status_code=400, detail="Invalid signature")
+    # except ValueError as e:
+    #     print("Invalid payload")
+    #     raise HTTPException(status_code=400, detail="Invalid payload")
     try:
+        # check Signature Webhook
         event = stripe.Webhook.construct_event(
             payload, signature_header, webhook_secret
         )
         print("Webhook verified!")
+
+        if event['type'] == 'invoice.payment_failed':
+            # Payment failed
+            invoice = event['data']['object']
+            payment_intent = invoice.get('payment_intent')
+
+            if payment_intent:
+                try:
+                    intent = stripe.PaymentIntent.retrieve(payment_intent)
+
+                    if intent.status == "requires_payment_method":
+                        print("Payment failed: The payment method was declined.")
+                        error_message = "The payment was declined. Please try a different payment method."
+                        print(f"Recommendation: {error_message}")
+                    else:
+                        print("Other error occurred.")
+                except stripe.error.CardError as e:
+                    body = e.json_body
+                    err = body.get("error", {})
+                    error_message = err.get("message")
+                    print(f"Card Error: {error_message}")
+                    user_message = "Your card was declined. Please check your card details or try a different card."
+                    print(f"Recommendation: {user_message}")
+                except Exception as e:
+                    print(f"General error: {e}")
+        else:
+            print(f"Unhandled event type: {event['type']}")
+
     except stripe.error.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid signature")
     except ValueError as e:
         print("Invalid payload")
         raise HTTPException(status_code=400, detail="Invalid payload")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
     # if event - checkout.session.completed
     if event["type"] == "checkout.session.completed":
