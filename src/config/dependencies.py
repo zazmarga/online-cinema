@@ -1,5 +1,3 @@
-import os
-
 from fastapi import Depends
 
 from src.config.settings import Settings, BaseAppSettings

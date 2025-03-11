@@ -122,7 +122,7 @@ def register_user(
     except SQLAlchemyError:
         raise HTTPException(
             status_code=500,
-            detail="An error occurred during user creation.",
+            detail=f"An error occurred during user creation.",
         )
     else:
         activation_link = "http://127.0.0.1/accounts/activate/"
@@ -853,7 +853,7 @@ def update_user(
             new_group = db.query(UserGroupModel).filter_by(name=data.group).first()
             if not new_group:
                 raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail="Group with the given name was not found.",
                 )
             user.group_id = new_group.id

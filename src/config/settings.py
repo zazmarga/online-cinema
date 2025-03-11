@@ -61,4 +61,10 @@ class Settings(BaseAppSettings):
     JWT_SIGNING_ALGORITHM: str = os.getenv("JWT_SIGNING_ALGORITHM", "HS256")
 
 
+class TestingSettings(BaseAppSettings):
+    SECRET_KEY_ACCESS: str = "SECRET_KEY_ACCESS"
+    SECRET_KEY_REFRESH: str = "SECRET_KEY_REFRESH"
+    JWT_SIGNING_ALGORITHM: str = "HS256"
+
+
 settings = Settings()

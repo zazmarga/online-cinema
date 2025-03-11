@@ -282,3 +282,5 @@ alembic
 
 # Docker
 Docker
+
+identifier.sqlite
