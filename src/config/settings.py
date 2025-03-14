@@ -61,10 +61,12 @@ class Settings(BaseAppSettings):
     JWT_SIGNING_ALGORITHM: str = os.getenv("JWT_SIGNING_ALGORITHM", "HS256")
 
 
-class TestingSettings(BaseAppSettings):
-    SECRET_KEY_ACCESS: str = "SECRET_KEY_ACCESS"
-    SECRET_KEY_REFRESH: str = "SECRET_KEY_REFRESH"
-    JWT_SIGNING_ALGORITHM: str = "HS256"
+class TestingSettings(Settings):
+    S3_STORAGE_HOST: str = os.getenv("MINIO_HOST", "127.0.0.1")
+    S3_STORAGE_PORT: int = os.getenv("MINIO_PORT", 9000)
+    S3_STORAGE_ACCESS_KEY: str = os.getenv("MINIO_ROOT_USER", "minioadmin")
+    S3_STORAGE_SECRET_KEY: str = os.getenv("MINIO_ROOT_PASSWORD", "minioadmin")
+    S3_BUCKET_NAME: str = os.getenv("MINIO_STORAGE", "cinema-storage")
 
 
 settings = Settings()

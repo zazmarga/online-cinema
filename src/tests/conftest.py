@@ -10,10 +10,13 @@ from src.database.models.base import Base
 from src.database.session import get_db
 from src.main import app
 from src.security.token_manager import JWTAuthManager
+from minio import Minio
+from minio.error import S3Error
 
-settings = TestingSettings()
 
-TEST_DATABASE_URL = f"sqlite:///{settings.PATH_TO_DB}"[:-3] + "_test.db"
+test_settings = TestingSettings()
+
+TEST_DATABASE_URL = f"sqlite:///{test_settings.PATH_TO_DB}"[:-3] + "_test.db"
 
 engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -41,6 +44,7 @@ def override_get_db(db_session):
 @pytest.fixture(autouse=True)
 def client():
     app.dependency_overrides[get_db] = override_get_db
+
     with TestClient(app) as client:
         yield client
 
@@ -67,9 +71,39 @@ def settings():
 
 
 @pytest.fixture(scope="function")
-def jwt_manager(settings):
+def jwt_manager(settings) -> JWTAuthManager:
     return JWTAuthManager(
         secret_key_access=settings.SECRET_KEY_ACCESS,
         secret_key_refresh=settings.SECRET_KEY_REFRESH,
         algorithm=settings.JWT_SIGNING_ALGORITHM,
     )
+
+
+@pytest.fixture(scope="module")
+def minio_client():
+    minio_host_port = f"{test_settings.S3_STORAGE_HOST}:{test_settings.S3_STORAGE_PORT}"
+    access_key = test_settings.S3_STORAGE_ACCESS_KEY
+    secret_key = test_settings.S3_STORAGE_SECRET_KEY
+    bucket_name = test_settings.S3_BUCKET_NAME
+
+    client = Minio(
+        minio_host_port,
+        access_key=access_key,
+        secret_key=secret_key,
+        secure=False,
+    )
+
+    # create bucket if it does not exist
+    if not client.bucket_exists(bucket_name):
+        client.make_bucket(bucket_name)
+
+    yield client
+
+    # clean after test
+    try:
+        objects = client.list_objects(bucket_name, prefix="avatars/", recursive=True)
+        for obj in objects:
+            client.remove_object(bucket_name, obj.object_name)
+        print("Storage cleaned successfully.")
+    except S3Error as e:
+        print(f"Error during cleanup: {e}")

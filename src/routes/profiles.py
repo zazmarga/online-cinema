@@ -41,7 +41,6 @@ def create_profile(
     - Upload avatar to S3 storage.
     - Store profile details in the database.
     """
-
     try:
         payload = jwt_manager.decode_access_token(token)
         token_user_id = payload.get("user_id")
@@ -69,7 +68,7 @@ def create_profile(
             detail="User not found or not active.",
         )
 
-    existing_profile = db.query(UserProfileModel).filter_by(user_id=user.id).first()
+    existing_profile = db.query(UserProfileModel).filter_by(user_id=user_id).first()
     if existing_profile:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -77,7 +76,7 @@ def create_profile(
         )
 
     avatar_bytes = profile_data.avatar.file.read()
-    avatar_key = f"avatars/{user.id}_{profile_data.avatar.filename}"
+    avatar_key = f"avatars/{user_id}_{profile_data.avatar.filename}"
 
     try:
         s3_client.upload_file(file_name=avatar_key, file_data=avatar_bytes)
@@ -89,7 +88,7 @@ def create_profile(
         )
 
     new_profile = UserProfileModel(
-        user_id=cast(int, user.id),
+        user_id=cast(int, user_id),
         first_name=profile_data.first_name,
         last_name=profile_data.last_name,
         gender=cast(GenderEnum, profile_data.gender),
@@ -103,7 +102,6 @@ def create_profile(
     db.refresh(new_profile)
 
     avatar_url = s3_client.get_file_url(new_profile.avatar)
-    print(f"{avatar_url=}")
 
     return ProfileResponseSchema(
         id=new_profile.id,
