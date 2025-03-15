@@ -169,15 +169,9 @@ def get_movie_list(
 
     total_pages = (total_items + per_page - 1) // per_page
 
-    prev_page = (
-        f"/movies/movies-list/?page={page - 1}&per_page={per_page}"
-        if page > 1
-        else None
-    )
+    prev_page = f"/movies/?page={page - 1}&per_page={per_page}" if page > 1 else None
     next_page = (
-        f"/movies/movies-list/?page={page + 1}&per_page={per_page}"
-        if page < total_pages
-        else None
+        f"/movies/?page={page + 1}&per_page={per_page}" if page < total_pages else None
     )
 
     if sort_by:
@@ -257,19 +251,19 @@ def search_movies(
     if directors:
         directors = normalize_search_list(directors)
         search_movies_query = search_movies_query.filter(
-            MovieModel.directors.any(DirectorModel.name.in_(directors))
+            MovieModel.directors.any(func.lower(DirectorModel.name).in_(directors))
         )
 
     if genres:
         genres = normalize_search_list(genres)
         search_movies_query = search_movies_query.filter(
-            MovieModel.genres.any(GenreModel.name.in_(genres))
+            MovieModel.genres.any(func.lower(GenreModel.name).in_(genres))
         )
 
     if stars:
         stars = normalize_search_list(stars)
         search_movies_query = search_movies_query.filter(
-            MovieModel.stars.any(StarModel.name.in_(stars))
+            MovieModel.stars.any(func.lower(StarModel.name).in_(stars))
         )
 
     movie_list = [
@@ -726,9 +720,7 @@ def create_movie(
         "<p>Allowed only for admins and moderators. "
     ),
     responses={
-        204: {
-            "description": "Movie deleted successfully."
-        },
+        204: {"description": "Movie deleted successfully."},
         401: {
             "description": "Unauthorized.",
             "content": {
@@ -754,7 +746,7 @@ def create_movie(
             },
         },
     },
-    status_code=204
+    status_code=204,
 )
 def delete_movie(
     movie_id: int,
@@ -788,24 +780,33 @@ def delete_movie(
     user = db.query(UserModel).filter(UserModel.id == user_id).first()
 
     if not user.is_admin and not user.is_moderator:
-        raise HTTPException(status_code=403, detail="You don't have permission to do this operation.")
+        raise HTTPException(
+            status_code=403, detail="You don't have permission to do this operation."
+        )
 
     movie = db.query(MovieModel).filter(MovieModel.id == movie_id).first()
 
     if not movie:
         raise HTTPException(
-            status_code=404,
-            detail="Movie with the given ID was not found."
+            status_code=404, detail="Movie with the given ID was not found."
         )
 
     stmt = select(PurchasedMovieModel).where(PurchasedMovieModel.c.movie_id == movie_id)
     result = db.execute(stmt).fetchall()
     if len(result) > 0:
-        raise HTTPException(status_code=403, detail="You don't have permission to do this operation. At least one user has purchased this movie.")
+        raise HTTPException(
+            status_code=403,
+            detail="You don't have permission to do this operation. At least one user has purchased this movie.",
+        )
 
-    cart_items = db.query(CartItemModel).filter(CartItemModel.movie_id == movie_id).all()
+    cart_items = (
+        db.query(CartItemModel).filter(CartItemModel.movie_id == movie_id).all()
+    )
     if len(cart_items) > 0:
-        raise HTTPException(status_code=403, detail="You don't have permission to do this operation. This movie is in at least one user's cart.")
+        raise HTTPException(
+            status_code=403,
+            detail="You don't have permission to do this operation. This movie is in at least one user's cart.",
+        )
 
     db.delete(movie)
     db.commit()
