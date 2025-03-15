@@ -31,4 +31,4 @@ class MovieFilter(Filter):
 
 
 def normalize_search_list(search_list: List[str]) -> List[str]:
-    return [item.title() for item in search_list]
+    return [item.lower() for item in search_list]

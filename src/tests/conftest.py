@@ -7,6 +7,7 @@ from src.config.dependencies import get_settings
 from src.config.settings import TestingSettings
 from src.database.models.accounts import UserGroupEnum, UserGroupModel
 from src.database.models.base import Base
+
 from src.database.session import get_db
 from src.main import app
 from src.security.token_manager import JWTAuthManager
@@ -107,3 +108,15 @@ def minio_client():
         print("Storage cleaned successfully.")
     except S3Error as e:
         print(f"Error during cleanup: {e}")
+
+
+@pytest.fixture(scope="function")
+def seed_database(db_session, settings):
+    from src.database.populate import CSVDatabaseSeeder
+
+    seeder = CSVDatabaseSeeder(
+        csv_file_path=settings.PATH_TO_MOVIES_CSV, db_session=db_session
+    )
+    if not seeder.is_db_populated():
+        seeder.seed()
+    yield db_session
