@@ -1015,10 +1015,9 @@ def update_movie_genres(
     except BaseSecurityError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
-    user_group = (
-        db.query(UserGroupModel).join(UserModel).filter(UserModel.id == user_id).first()
-    )
-    if user_group == UserGroupEnum.USER:
+    user = db.query(UserModel).get(user_id)
+
+    if not user.is_admin and not user.is_moderator:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You don't have permission to do this operation.",
@@ -1457,6 +1456,10 @@ def add_comment_to_movie(
         user_id = payload.get("user_id")
     except BaseSecurityError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    movie = db.query(MovieModel).get(movie_id)
+    if not movie:
+        raise HTTPException(status_code=404, detail="Movie not found.")
 
     if not comment_input.content or not comment_input.content.strip():
         raise HTTPException(

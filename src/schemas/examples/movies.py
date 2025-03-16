@@ -11,8 +11,8 @@ movie_item_schema_example = {
 
 movie_list_response_schema_example = {
     "movies": [movie_item_schema_example],
-    "prev_page": "/movies/movies-list/?page=1&per_page=1",
-    "next_page": "/movies/movies-list?page=3&per_page=1",
+    "prev_page": "/movies/?page=1&per_page=1",
+    "next_page": "/movies/?page=3&per_page=1",
     "total_pages": 930,
     "total_items": 930,
 }

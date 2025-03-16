@@ -11,7 +11,15 @@ from src.database.models.movies import (
     StarModel,
     DirectorModel,
     CertificationModel,
+    FavoriteMovieModel,
+    LikeMovieModel,
+    RatingMovieModel,
+    CommentModel,
+    MoviesCommentsModel,
+    comment_likes,
+    ReplyModel,
 )
+from src.database.services.movies import get_random_movie
 from src.tests.conftest import jwt_manager
 
 
@@ -983,3 +991,785 @@ def test_search_movies_by_genres_stars_directors(
                 assert (
                     movie.id in response_movie_ids
                 ), f"{movie.id} not in {response_movie_ids}"
+
+
+def test_add_or_remove_movie_to_favorite(
+    client, db_session, jwt_manager, seed_database
+):
+    """
+    Test adding or removing a movie to/from favorite.
+    Check that the movie is added to favorite (is_favorite=True)
+        or removed from favorite (is_favorite=False).
+    The endpoint returns a 404 error when a movie with the given ID does not exist.
+    """
+    user = UserModel.create(
+        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+    )
+    user.is_active = True
+    db_session.add(user)
+    db_session.commit()
+    access_token = jwt_manager.create_access_token({"user_id": user.id})
+
+    movie_id = 99999
+    is_favorite = True
+
+    # unexisting movie
+    response = client.post(
+        f"/api/v1/movies/{movie_id}/?is_favorite={is_favorite}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert (
+        response.status_code == 404,
+    ), f"Expected status code 404, but got {response.status_code}"
+    expected_detail = {"detail": "Movie with the given ID was not found."}
+    assert (
+        response.json() == expected_detail
+    ), f"Expected {expected_detail}, got {response.json()}"
+
+    # is_favorite = True
+    random_movie = get_random_movie(db_session)
+
+    response = client.post(
+        f"/api/v1/movies/{random_movie.id}/?is_favorite={is_favorite}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    response_data = response.json()
+    assert (
+        response.status_code == 200
+    ), f"Expected status code 200, but got {response.status_code}"
+    assert (
+        response_data["is_favorite"] == True
+    ), f"Expected that is_favorite is True, but {response_data["is_favorite"]} got."
+    exist_movie_in_favorite = (
+        db_session.query(FavoriteMovieModel)
+        .filter(
+            FavoriteMovieModel.c.movie_id == random_movie.id,
+            FavoriteMovieModel.c.user_id == user.id,
+        )
+        .first()
+    )
+    assert exist_movie_in_favorite is not None, "Movie not in favorite."
+
+    # is_favorite = False
+    is_favorite = False
+    response = client.post(
+        f"/api/v1/movies/{random_movie.id}/?is_favorite={is_favorite}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    response_data = response.json()
+    assert (
+        response.status_code == 200
+    ), f"Expected status code 200, but got {response.status_code}"
+    assert (
+        response_data["is_favorite"] == False
+    ), f"Expected that is_favorite is False, but {response_data["is_favorite"]} got."
+    exist_movie_in_favorite = (
+        db_session.query(FavoriteMovieModel)
+        .filter(
+            FavoriteMovieModel.c.movie_id == random_movie.id,
+            FavoriteMovieModel.c.user_id == user.id,
+        )
+        .first()
+    )
+    assert exist_movie_in_favorite is None, "Movie must not be in favorite."
+
+
+def test_adding_like_or_dislike_to_movie(
+    client, db_session, jwt_manager, seed_database
+):
+    """
+    Test adding a like (is_liked=True) or dislike (is_liked=False) to a movie.
+    Or remove like or dislike for this movie (remove_like_dislike = yes).
+    """
+    user = UserModel.create(
+        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+    )
+    user.is_active = True
+    db_session.add(user)
+    db_session.commit()
+    access_token = jwt_manager.create_access_token({"user_id": user.id})
+
+    random_movie = get_random_movie(db_session)
+
+    # is liked
+    is_liked = True
+    response = client.post(
+        f"/api/v1/movies/{random_movie.id}/?is_liked={is_liked}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert (
+        response.status_code == 200
+    ), f"Expected status code 200, but got {response.status_code}"
+    response_data = response.json()
+    assert (
+        response_data["is_liked"] == True
+    ), f"Expected that is_liked is True, but {response_data["is_liked"]} got."
+    exist_movie_in_likes_dislikes = (
+        db_session.query(LikeMovieModel)
+        .filter(
+            LikeMovieModel.c.movie_id == random_movie.id,
+            LikeMovieModel.c.user_id == user.id,
+        )
+        .first()
+    )
+    assert (
+        exist_movie_in_likes_dislikes is not None
+    ), "Movie must be in liked_unliked_movies table."
+    assert (
+        exist_movie_in_likes_dislikes.is_liked == True
+    ), "Movie is_liked must be True in liked_unliked_movies table."
+
+    # is disliked
+    is_liked = False
+    response = client.post(
+        f"/api/v1/movies/{random_movie.id}/?is_liked={is_liked}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert (
+        response.status_code == 200
+    ), f"Expected status code 200, but got {response.status_code}"
+    response_data = response.json()
+    assert (
+        response_data["is_liked"] == False
+    ), f"Expected that is_liked is False, but {response_data["is_liked"]} got."
+    exist_movie_in_likes_dislikes = (
+        db_session.query(LikeMovieModel)
+        .filter(
+            LikeMovieModel.c.movie_id == random_movie.id,
+            LikeMovieModel.c.user_id == user.id,
+        )
+        .first()
+    )
+    assert (
+        exist_movie_in_likes_dislikes is not None
+    ), "Movie must be in liked_unliked_movies table."
+    assert (
+        exist_movie_in_likes_dislikes.is_liked == False
+    ), "Movie is_liked must be False in liked_unliked_movies table."
+
+    # remove like/dislike marks
+    remove_like_dislike = "yes"
+    response = client.post(
+        f"/api/v1/movies/{random_movie.id}/?remove_like_dislike={remove_like_dislike}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert (
+        response.status_code == 200
+    ), f"Expected status code 200, but got {response.status_code}"
+    response_data = response.json()
+    assert (
+        response_data["remove_like_dislike"] == "yes"
+    ), f"Expected that remove_like_dislike is 'yes', but {response_data["remove_like_dislike"]} got."
+    exist_movie_in_likes_dislikes = (
+        db_session.query(LikeMovieModel)
+        .filter(
+            LikeMovieModel.c.movie_id == random_movie.id,
+            LikeMovieModel.c.user_id == user.id,
+        )
+        .first()
+    )
+    assert (
+        exist_movie_in_likes_dislikes is None
+    ), "Movie must not be in liked_unliked_movies table."
+
+
+def test_can_to_rate_movie(client, db_session, jwt_manager, seed_database):
+    """
+    Test that user can to rate movie from 1 to 10.
+    """
+    user = UserModel.create(
+        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+    )
+    user.is_active = True
+    db_session.add(user)
+    db_session.commit()
+    access_token = jwt_manager.create_access_token({"user_id": user.id})
+
+    random_movie = get_random_movie(db_session)
+
+    # invalid rate
+    to_rate = 999
+    response = client.post(
+        f"/api/v1/movies/{random_movie.id}/?to_rate={to_rate}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert (
+        response.status_code == 422
+    ), f"Expected status code 422, but got {response.status_code}. Rate must be from 1 to 10."
+
+    # right rate
+    to_rate = 9
+    response = client.post(
+        f"/api/v1/movies/{random_movie.id}/?to_rate={to_rate}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert (
+        response.status_code == 200
+    ), f"Expected status code 200, but got {response.status_code}"
+    response_data = response.json()
+    assert (
+        response_data["to_rate"] == to_rate
+    ), f"Expected that to_rate is {to_rate}, but {response_data["to_rate"]} got."
+
+    exist_movie_rating = (
+        db_session.query(RatingMovieModel)
+        .filter(
+            RatingMovieModel.c.movie_id == random_movie.id,
+            RatingMovieModel.c.user_id == user.id,
+        )
+        .first()
+    )
+    assert exist_movie_rating is not None, "Movie must be in rating_movies table."
+    assert (
+        exist_movie_rating.rating == to_rate
+    ), f"Movie rating must be {to_rate} in rating_movies table."
+
+
+def test_favorite_likes_rating_to_movie_allowed_only_registered_user(client):
+    """
+    Test that only registered users can add a movie to favorites, put like/dislike, and rate movies.
+    """
+    movie_id = 1
+    response = client.post(f"/api/v1/movies/{movie_id}/")
+    assert (
+        response.status_code == 401
+    ), f"Expected status code 401 Unauthorized, but got {response.status_code}"
+
+
+def test_update_genres_of_movie_by_movie_id_allowed_only_admin_or_moderator(
+    client, db_session, jwt_manager, seed_database
+):
+    """
+    Test that only admins and moderators can update genres of  movie.
+    """
+    # unauthorized
+    movie_id = 1
+    response = client.post(f"/api/v1/movies/{movie_id}/update-genres/")
+    assert (
+        response.status_code == 401
+    ), f"Expected status code 401 Unauthorized, but got {response.status_code}"
+
+    # authorized USER, group_id = 1
+    user = UserModel.create(
+        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+    )
+    user.is_active = True
+    db_session.add(user)
+    db_session.commit()
+    access_token = jwt_manager.create_access_token({"user_id": user.id})
+
+    data = {"genres": ["Test genre1", "Test genre2"]}
+    response = client.post(
+        f"/api/v1/movies/{movie_id}/update-genres/",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json=data,
+    )
+    assert (
+        response.status_code == 403
+    ), f"Expected status code 403 Forbidden, but got {response.status_code}"
+
+
+def test_update_genres_of_movie_by_movie_id(
+    client, db_session, jwt_manager, seed_database
+):
+    """
+    Test that admins and moderators can update genres of movie.
+    """
+    # group_user != 1
+    user = UserModel.create(
+        email="test@mate.com", raw_password="TestPassword123!", group_id=2
+    )
+    user.is_active = True
+    db_session.add(user)
+    db_session.commit()
+    access_token = jwt_manager.create_access_token({"user_id": user.id})
+
+    movie_id = 1
+    data = {"genres": ["Test Genre1", "Test Genre2"]}
+    exists_genres = db_session.query(GenreModel, GenreModel.name).all()
+    exists_genres = [name for genre, name in exists_genres]
+
+    response = client.post(
+        f"/api/v1/movies/{movie_id}/update-genres/",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json=data,
+    )
+    assert (
+        response.status_code == 200
+    ), f"Expected status code 200, but got {response.status_code}"
+    response_data = response.json()
+    assert ("genres" in response_data["genres"],), f"Must be 'genres' in response_data"
+    assert len(response_data["genres"]) == len(
+        data["genres"]
+    ), "Genres must have same quantity."
+
+    exists_genres_after = db_session.query(GenreModel, GenreModel.name).all()
+    exists_genres_after = [name for genre, name in exists_genres_after]
+    assert (
+        len(exists_genres_after) - len(exists_genres) == 2
+    ), "Must added two new genres to db."
+    updated_movie = db_session.query(MovieModel).get(movie_id)
+    assert [genre.name for genre in updated_movie.genres] == data[
+        "genres"
+    ], "Genres should be updated."
+
+
+def test_update_directors_of_movie_by_movie_id(
+    client, db_session, jwt_manager, seed_database
+):
+    """
+    Test that admins and moderators can update directors of movie.
+    """
+    # group_user != 1
+    user = UserModel.create(
+        email="test@mate.com", raw_password="TestPassword123!", group_id=2
+    )
+    user.is_active = True
+    db_session.add(user)
+    db_session.commit()
+    access_token = jwt_manager.create_access_token({"user_id": user.id})
+
+    movie_id = 1
+    data = {"directors": ["Test Director"]}
+    exists_directors = db_session.query(DirectorModel, DirectorModel.name).all()
+    exists_directors = [name for genre, name in exists_directors]
+
+    response = client.post(
+        f"/api/v1/movies/{movie_id}/update-directors/",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json=data,
+    )
+    assert (
+        response.status_code == 200
+    ), f"Expected status code 200, but got {response.status_code}"
+    response_data = response.json()
+    assert (
+        "directors" in response_data["directors"],
+    ), f"Must be 'directors' in response_data"
+    assert len(response_data["directors"]) == len(
+        data["directors"]
+    ), "Directors must have same quantity."
+
+    exists_directors_after = db_session.query(DirectorModel, DirectorModel.name).all()
+    exists_directors_after = [name for director, name in exists_directors_after]
+    assert (
+        len(exists_directors_after) - len(exists_directors) == 1
+    ), "Must added new director to db."
+    updated_movie = db_session.query(MovieModel).get(movie_id)
+    assert [director.name for director in updated_movie.directors] == data[
+        "directors"
+    ], "Directors should be updated."
+
+
+def test_update_stars_of_movie_by_movie_id(
+    client, db_session, jwt_manager, seed_database
+):
+    """
+    Test that admins and moderators can update stars of movie.
+    """
+    # group_user != 1
+    user = UserModel.create(
+        email="test@mate.com", raw_password="TestPassword123!", group_id=2
+    )
+    user.is_active = True
+    db_session.add(user)
+    db_session.commit()
+    access_token = jwt_manager.create_access_token({"user_id": user.id})
+
+    movie_id = 1
+    data = {"stars": ["Test Star1", "Test Star2", "Test Star3"]}
+    exists_stars = db_session.query(StarModel, StarModel.name).all()
+    exists_stars = [name for star, name in exists_stars]
+
+    response = client.post(
+        f"/api/v1/movies/{movie_id}/update-stars/",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json=data,
+    )
+    assert (
+        response.status_code == 200
+    ), f"Expected status code 200, but got {response.status_code}"
+    response_data = response.json()
+    assert ("stars" in response_data["stars"],), f"Must be 'stars' in response_data"
+    assert len(response_data["stars"]) == len(
+        data["stars"]
+    ), "Stars must have same quantity."
+
+    exists_stars_after = db_session.query(StarModel, StarModel.name).all()
+    exists_stars_after = [name for star, name in exists_stars_after]
+    assert (
+        len(exists_stars_after) - len(exists_stars) == 3
+    ), "Must added 3 new stars to db."
+    updated_movie = db_session.query(MovieModel).get(movie_id)
+    assert [star.name for star in updated_movie.stars] == data[
+        "stars"
+    ], "Stars should be updated."
+
+
+def test_adding_comments_to_movie_by_movie_id_allowed_only_registered_user(client):
+    """
+    Test that only registered users can add comments to a movie.
+    """
+    movie_id = 1
+    response = client.post(f"/api/v1/movies/{movie_id}/comments/add/")
+    assert (
+        response.status_code == 401
+    ), f"Expected status code 401 Unauthorized, but got {response.status_code}"
+
+
+def test_adding_comments_to_unexisting_movie(
+    client, db_session, jwt_manager, seed_database
+):
+    """
+    Test that can not add comments to an unexisting movie.
+    """
+    user = UserModel.create(
+        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+    )
+    user.is_active = True
+    db_session.add(user)
+    db_session.commit()
+    access_token = jwt_manager.create_access_token({"user_id": user.id})
+
+    unexisting_movie_id = 99999
+    data = {"content": "Cool movie!"}
+    response = client.post(
+        f"/api/v1/movies/{unexisting_movie_id}/comments/add/",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json=data,
+    )
+    assert (
+        response.status_code == 404
+    ), f"Expected status code 404 Not Found, but got {response.status_code}"
+
+
+def test_adding_comments_to_movie_by_movie_id(
+    client, db_session, jwt_manager, seed_database
+):
+    """
+    Test that user can add comments to a movie by movie ID.
+    """
+    user = UserModel.create(
+        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+    )
+    user.is_active = True
+    db_session.add(user)
+    db_session.commit()
+    access_token = jwt_manager.create_access_token({"user_id": user.id})
+
+    random_movie = get_random_movie(db_session)
+    data = {"content": "Cool movie!"}
+    response = client.post(
+        f"/api/v1/movies/{random_movie.id}/comments/add/",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json=data,
+    )
+    assert (
+        response.status_code == 201
+    ), f"Expected status code 201 Created, but got {response.status_code}"
+    response_data = response.json()
+    assert (
+        "message" in response_data
+    ), "Message should be in response: The comment was added successfully."
+
+    comment_in_db = (
+        db_session.query(CommentModel)
+        .filter(
+            CommentModel.content == data["content"], CommentModel.user_id == user.id
+        )
+        .first()
+    )
+    assert comment_in_db is not None, "Comment should be added to db."
+
+    comment_to_movie = (
+        db_session.query(MoviesCommentsModel)
+        .filter(
+            MoviesCommentsModel.c.movie_id == random_movie.id,
+            MoviesCommentsModel.c.user_id == user.id,
+            MoviesCommentsModel.c.comment_id == comment_in_db.id,
+        )
+        .first()
+    )
+    assert (
+        comment_to_movie is not None
+    ), "Comment should be added to movie_comments table."
+
+
+def test_adding_empty_comments_to_movie_by_movie_id(
+    client, db_session, jwt_manager, seed_database
+):
+    """
+    Test that if user add empty comment to a movie by movie ID returns 400 error Bad Request.
+    """
+    user = UserModel.create(
+        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+    )
+    user.is_active = True
+    db_session.add(user)
+    db_session.commit()
+    access_token = jwt_manager.create_access_token({"user_id": user.id})
+
+    random_movie = get_random_movie(db_session)
+    data = {"content": ""}
+    response = client.post(
+        f"/api/v1/movies/{random_movie.id}/comments/add/",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json=data,
+    )
+    assert (
+        response.status_code == 400
+    ), f"Expected status code 400 Bad Request, but got {response.status_code}"
+    response_data = response.json()
+    assert (
+        "detail" in response_data
+    ), "Detail should be in response: Content of the comment not be empty."
+
+
+def test_get_list_comments_for_movie_by_movie_id(
+    client, db_session, jwt_manager, seed_database
+):
+    """
+    Test that list of comments for movie includes all comments of all users for this specific movie.
+    """
+    user = UserModel.create(
+        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+    )
+    user.is_active = True
+    db_session.add(user)
+    db_session.commit()
+    access_token = jwt_manager.create_access_token({"user_id": user.id})
+
+    random_movie = get_random_movie(db_session)
+    data = {"content": "Test Comment From User!"}
+    client.post(
+        f"/api/v1/movies/{random_movie.id}/comments/add/",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json=data,
+    )
+
+    other_user = UserModel.create(
+        email="test_other@mate.com", raw_password="TestOtherPassword123!", group_id=2
+    )
+    other_user.is_active = True
+    db_session.add(other_user)
+    db_session.commit()
+    access_token = jwt_manager.create_access_token({"user_id": other_user.id})
+    data = {"content": "Test2 Comment From Other User!"}
+    client.post(
+        f"/api/v1/movies/{random_movie.id}/comments/add/",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json=data,
+    )
+
+    comments_in_db = (
+        db_session.query(CommentModel)
+        .join(MoviesCommentsModel, MoviesCommentsModel.c.comment_id == CommentModel.id)
+        .filter(MoviesCommentsModel.c.movie_id == random_movie.id)
+        .all()
+    )
+
+    response = client.get(
+        f"/api/v1/movies/{random_movie.id}/comments/",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert (
+        response.status_code == 200
+    ), f"Expected status code 200, but got {response.status_code}"
+
+    response_data = response.json()
+    assert "comments" in response_data, f"Must be list of 'comments' in response data."
+    assert len(response_data["comments"]) == len(
+        comments_in_db
+    ), f"Expected {len(comments_in_db)} comments in response."
+    assert len(response_data["comments"]) == 2, "This movie must has 2 comments."
+    assert (
+        response_data["comments"][0]["user_id"]
+        != response_data["comments"][1]["user_id"]
+    ), "Comments should be from different users."
+
+
+def test_if_movie_does_not_have_any_comment(
+    client, db_session, jwt_manager, seed_database
+):
+    """
+    Test list comments, if a movie does not have any comments yet, it should return 404 Not Found.
+    """
+    user = UserModel.create(
+        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+    )
+    user.is_active = True
+    db_session.add(user)
+    db_session.commit()
+    access_token = jwt_manager.create_access_token({"user_id": user.id})
+
+    random_movie = get_random_movie(db_session)
+    response = client.get(
+        f"/api/v1/movies/{random_movie.id}/comments/",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert (
+        response.status_code == 404
+    ), f"Expected status code 404, but got {response.status_code}"
+    response_data = response.json()
+    assert (
+        response_data["detail"] == "This movie does not have comments yet."
+    ), "Unexpected response detail."
+
+
+def test_only_registered_users_can_comment_to_other_users_comments(client):
+    """
+    Test that only registered users can comment and like other users' comments.
+    """
+    movie_id = 1
+    comment_id = 1
+    response = client.post(
+        f"/api/v1/movies/{movie_id}/comments/add/?comment_id={comment_id}"
+    )
+    assert (
+        response.status_code == 401
+    ), f"Expected status code 401 Unauthorized, but got {response.status_code}"
+
+
+def test_user_can_put_likes_to_comments(client, db_session, jwt_manager, seed_database):
+    """
+    Test  that user can put likes any comments.
+    """
+    other_user = UserModel.create(
+        email="other_test@mate.com", raw_password="TestOtherPassword123!", group_id=1
+    )
+    other_user.is_active = True
+    db_session.add(other_user)
+    db_session.commit()
+    access_token = jwt_manager.create_access_token({"user_id": other_user.id})
+
+    random_movie = get_random_movie(db_session)
+    data = {"content": "Cool movie!"}
+    client.post(
+        f"/api/v1/movies/{random_movie.id}/comments/add/",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json=data,
+    )
+    comment_in_db = (
+        db_session.query(CommentModel).filter_by(user_id=other_user.id).first()
+    )
+
+    user = UserModel.create(
+        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+    )
+    user.is_active = True
+    db_session.add(user)
+    db_session.commit()
+    access_token = jwt_manager.create_access_token({"user_id": user.id})
+
+    data = {"content": ""}
+    is_liked = True
+    response = client.post(
+        f"/api/v1/movies/{random_movie.id}/comments/actions/?comment_id={comment_in_db.id}&is_liked={is_liked}",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json=data,
+    )
+
+    assert (
+        response.status_code == 201
+    ), f"Expected status code 201 Created, but got {response.status_code}"
+
+    response_data = response.json()
+    assert (
+        "message" in response_data
+    ), "Must be message in response: The like/comment was added successfully."
+
+    like_in_db = db_session.execute(
+        comment_likes.select().where(
+            comment_likes.c.user_id == user.id,
+            comment_likes.c.comment_id == comment_in_db.id,
+        )
+    ).fetchone()
+
+    assert like_in_db is not None, "Must be saved like in db for this comment."
+
+    data = {"content": ""}
+    is_liked = False
+    response = client.post(
+        f"/api/v1/movies/{random_movie.id}/comments/actions/?comment_id={comment_in_db.id}&is_liked={is_liked}",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json=data,
+    )
+    assert (
+        response.status_code == 201
+    ), f"Expected status code 201 Created, but got {response.status_code}"
+
+    response_data = response.json()
+    assert (
+        "message" in response_data
+    ), "Must be message in response: The like/comment was added successfully."
+
+    like_in_db = db_session.execute(
+        comment_likes.select().where(
+            comment_likes.c.user_id == user.id,
+            comment_likes.c.comment_id == comment_in_db.id,
+        )
+    ).fetchone()
+
+    assert like_in_db is None, "Must not be like in db for this comment."
+
+
+def test_user_can_reply_for_comments(client, db_session, jwt_manager, seed_database):
+    """
+    Test  that user can replay for any comments.
+    """
+    other_user = UserModel.create(
+        email="other_test@mate.com", raw_password="TestOtherPassword123!", group_id=1
+    )
+    other_user.is_active = True
+    db_session.add(other_user)
+    db_session.commit()
+    access_token = jwt_manager.create_access_token({"user_id": other_user.id})
+
+    random_movie = get_random_movie(db_session)
+    data = {"content": "Cool movie!"}
+    client.post(
+        f"/api/v1/movies/{random_movie.id}/comments/add/",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json=data,
+    )
+    comment_in_db = (
+        db_session.query(CommentModel).filter_by(user_id=other_user.id).first()
+    )
+
+    user = UserModel.create(
+        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+    )
+    user.is_active = True
+    db_session.add(user)
+    db_session.commit()
+    access_token = jwt_manager.create_access_token({"user_id": user.id})
+
+    data = {"content": "Yes, it is."}
+    response = client.post(
+        f"/api/v1/movies/{random_movie.id}/comments/actions/?comment_id={comment_in_db.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json=data,
+    )
+
+    assert (
+        response.status_code == 201
+    ), f"Expected status code 201 Created, but got {response.status_code}"
+
+    response_data = response.json()
+    assert (
+        "message" in response_data
+    ), "Must be message in response: The like/comment was added successfully."
+
+    reply_in_db = (
+        db_session.query(ReplyModel)
+        .filter(
+            ReplyModel.user_id == user.id,
+            ReplyModel.comment_id == comment_in_db.id,
+            ReplyModel.content == data["content"],
+        )
+        .first()
+    )
+
+    assert reply_in_db is not None, "Must be saved reply in db for this comment."

@@ -1,9 +1,9 @@
 from typing import List, Any
 
-from sqlalchemy import update
+from sqlalchemy import update, func
 from sqlalchemy.orm import Session
 
-from src.database.models.movies import MovieModel, FavoriteMovieModel, LikeMovieModel
+from src.database.models.movies import MovieModel, FavoriteMovieModel
 from src.schemas.movies import MovieListItemSchema
 
 
@@ -53,3 +53,8 @@ def update_table_field(
     )
     session.execute(stmt)
     session.commit()
+
+
+def get_random_movie(db_session: Session):
+    random_movie = db_session.query(MovieModel).order_by(func.random()).first()
+    return random_movie
