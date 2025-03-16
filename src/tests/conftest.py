@@ -1,4 +1,7 @@
+import subprocess
+
 import pytest
+import requests
 from sqlalchemy import create_engine, insert
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
@@ -120,3 +123,17 @@ def seed_database(db_session, settings):
     if not seeder.is_db_populated():
         seeder.seed()
     yield db_session
+
+
+def restart_mailhog():
+    try:
+        subprocess.run(["docker", "restart", "mailhog"], check=True)
+        print("MailHog has been restarted successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to restart MailHog: {e}")
+
+
+@pytest.fixture(scope="function", autouse=True)
+def cleanup_mailhog():
+    yield
+    restart_mailhog()

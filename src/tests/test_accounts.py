@@ -121,28 +121,6 @@ def test_register_user_conflict(client, db_session, seed_user_groups):
     ), f"Expected error message: {expected_message}"
 
 
-# def test_register_user_internal_server_error(client, seed_user_groups):
-#     """
-#     Test server error during user registration.
-#
-#     Ensures that a 500 Internal Server Error is returned when a database operation fails.
-#     """
-#     payload = {"email": "erroruser@example.com", "password": "StrongPassword123!"}
-#
-#     with patch("routes.accounts.Session.commit", side_effect=SQLAlchemyError):
-#         response = client.post("/api/v1/accounts/register/", json=payload)
-#
-#         assert (
-#             response.status_code == 500
-#         ), "Expected status code 500 for internal server error."
-#
-#         response_data = response.json()
-#         expected_message = "An error occurred during user creation."
-#         assert (
-#             response_data["detail"] == expected_message
-#         ), f"Expected error message: {expected_message}"
-
-
 def test_activate_account_success(client, db_session, seed_user_groups):
     """
     Test successful activation of a user account.
