@@ -25,7 +25,7 @@ def test_create_user_profile_with_avatar(
     """
 
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -189,13 +189,13 @@ def test_admin_creates_user_profile(
     """
 
     admin_user = UserModel.create(
-        email="admin@mate.com", raw_password="AdminPass123!", group_id=3
+        email="admin@example.com", raw_password="AdminPass123!", group_id=3
     )
     admin_user.is_active = True
     db_session.add(admin_user)
 
     regular_user = UserModel.create(
-        email="user@mate.com", raw_password="UserPass123!", group_id=1
+        email="user@example.com", raw_password="UserPass123!", group_id=1
     )
     regular_user.is_active = True
     db_session.add(regular_user)
@@ -281,13 +281,13 @@ def test_user_cannot_create_another_user_profile(
     """
 
     user_1 = UserModel.create(
-        email="user1@mate.com", raw_password="User1Pass123!", group_id=1
+        email="user1@example.com", raw_password="User1Pass123!", group_id=1
     )  # 1 = User
     user_1.is_active = True
     db_session.add(user_1)
 
     user_2 = UserModel.create(
-        email="user2@mate.com", raw_password="User2Pass123!", group_id=1
+        email="user2@example.com", raw_password="User2Pass123!", group_id=1
     )  # 1 = User
     user_2.is_active = True
     db_session.add(user_2)
@@ -340,7 +340,7 @@ def test_inactive_user_cannot_create_profile(
     """
 
     user = UserModel.create(
-        email="inactive@mate.com", raw_password="TestPassword123!", group_id=1
+        email="inactive@example.com", raw_password="TestPassword123!", group_id=1
     )  # 1 = User
     user.is_active = False
     db_session.add(user)
@@ -392,7 +392,7 @@ def test_cannot_create_profile_twice(
     """
 
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)

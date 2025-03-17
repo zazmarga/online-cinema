@@ -20,6 +20,12 @@ app.include_router(
     accounts_router, prefix=f"{api_version_prefix}/accounts", tags=["accounts"]
 )
 
+
+app.include_router(
+    profiles_router, prefix=f"{api_version_prefix}/profiles", tags=["profiles"]
+)
+
+
 app.include_router(
     movies_router, prefix=f"{api_version_prefix}/movies", tags=["movies"]
 )
@@ -35,10 +41,6 @@ app.include_router(
 
 app.include_router(
     payments_router, prefix=f"{api_version_prefix}/payments", tags=["payments"]
-)
-
-app.include_router(
-    profiles_router, prefix=f"{api_version_prefix}/profiles", tags=["profiles"]
 )
 
 

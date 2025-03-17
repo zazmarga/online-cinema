@@ -36,20 +36,9 @@ router = APIRouter()
             },
         },
         404: {
-            "description": "Not found",
+            "description": "Not Found.",
             "content": {
-                "application/json": {
-                    "examples": {
-                        "user_not_found": {
-                            "summary": "User not found",
-                            "value": {"detail": "User not found."},
-                        },
-                        "movie_not_found": {
-                            "summary": "Movie not found",
-                            "value": {"detail": "Movie not found."},
-                        },
-                    }
-                }
+                "application/json": {"example": {"detail": "Movie not found."}}
             },
         },
         409: {
@@ -121,10 +110,14 @@ def add_movie_to_user_cart(
             db.add(user_cart)
             db.flush()
 
-        item_to_cart = CartItemModel(cart_id=user_cart.id, movie_id=movie.id)
-        db.add(item_to_cart)
-        db.commit()
-        db.refresh(item_to_cart)
+        try:
+            item_to_cart = CartItemModel(cart_id=user_cart.id, movie_id=movie.id)
+            db.add(item_to_cart)
+            db.commit()
+            db.refresh(item_to_cart)
+        except SQLAlchemyError as e:
+            db.rollback()
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
         return MessageResponseSchema(
             message="The movie has been added to user cart successfully."
@@ -188,12 +181,13 @@ def get_user_cart(
         current_user_id = payload.get("user_id")
     except BaseSecurityError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
-
+    print(f"{current_user_id=}")
     user_cart = db.get(CartModel, current_user_id)
     if not user_cart:
         user_cart = CartModel(user_id=current_user_id)
         db.add(user_cart)
-        db.flush()
+        db.commit()
+        print(f"{user_cart.id=}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User cart is empty."
         )
@@ -402,14 +396,9 @@ def get_list_carts(
     except BaseSecurityError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
-    user_group = (
-        db.query(UserGroupModel)
-        .join(UserModel)
-        .filter(UserModel.id == current_user_id)
-        .first()
-    )
+    current_user = db.query(UserModel).get(current_user_id)
 
-    if user_group.name != UserGroupEnum.ADMIN:
+    if not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You don't have permission to do this operation.",

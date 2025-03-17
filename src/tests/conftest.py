@@ -1,7 +1,6 @@
 import subprocess
 
 import pytest
-import requests
 from sqlalchemy import create_engine, insert
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
@@ -133,7 +132,7 @@ def restart_mailhog():
         print(f"Failed to restart MailHog: {e}")
 
 
-@pytest.fixture(scope="function", autouse=True)
+@pytest.fixture(scope="function", autouse=False)
 def cleanup_mailhog():
     yield
     restart_mailhog()

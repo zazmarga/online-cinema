@@ -231,8 +231,8 @@ def test_about_like_to_user_comment_email_notification(
     Test about like to user comment email notification is sent.
     """
     test_user_can_put_likes_to_comments(client, db_session, jwt_manager, seed_database)
-    # call  with   email="other_test@mate.com"
-    user_email = "other_test@mate.com"
+    # call  with   email="other_test@example.com"
+    user_email = "other_test@example.com"
 
     with httpx.Client() as email_client:
         mailhog_response = email_client.get(MAILHOG_URL)
@@ -271,8 +271,8 @@ def test_about_reply_to_user_comment_email_notification(
     Test about any reply to user comment email notification is sent.
     """
     test_user_can_reply_for_comments(client, db_session, jwt_manager, seed_database)
-    # call  with   email="other_test@mate.com"
-    user_email = "other_test@mate.com"
+    # call  with   email="other_test@example.com"
+    user_email = "other_test@example.com"
 
     with httpx.Client() as email_client:
         mailhog_response = email_client.get(MAILHOG_URL)

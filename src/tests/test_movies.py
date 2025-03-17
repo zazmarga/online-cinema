@@ -28,7 +28,7 @@ def test_get_movies_empty_database(db_session, client, jwt_manager):
     Test that the `/movies/` endpoint returns a 404 error when the database is empty.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -52,7 +52,7 @@ def test_get_movies_default_parameters(db_session, client, jwt_manager, seed_dat
     Test the `/movies/` endpoint with default pagination parameters.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -97,7 +97,7 @@ def test_get_movies_with_custom_parameters(
     Test the `/movies/` endpoint with custom pagination parameters.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -168,7 +168,7 @@ def test_invalid_page_and_per_page(
     Test the `/movies/` endpoint with invalid `page` and `per_page` parameters.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -200,7 +200,7 @@ def test_per_page_maximum_allowed_value(client, seed_database, db_session, jwt_m
     Test the `/movies/` endpoint with the maximum allowed `per_page` value.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -229,7 +229,7 @@ def test_page_exceeds_maximum(client, db_session, seed_database, jwt_manager):
     Test the `/movies/` endpoint with a page number that exceeds the maximum.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -260,7 +260,7 @@ def test_movies_sorted_by_id_desc(client, db_session, seed_database, jwt_manager
     and match the expected data from the database.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -302,7 +302,7 @@ def test_movie_list_with_pagination(client, db_session, seed_database, jwt_manag
     - The `prev_page` and `next_page` links are correct.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -354,7 +354,7 @@ def test_movies_fields_match_schema(client, db_session, seed_database, jwt_manag
     Test that each movie in the response matches the fields defined in `MovieListItemSchema`.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -389,7 +389,7 @@ def test_get_movie_by_id_not_found(client, db_session, jwt_manager):
     when a movie with the given ID does not exist.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -425,7 +425,7 @@ def test_get_movie_by_id_valid(client, db_session, seed_database, jwt_manager):
     - The movie's `id` and `name` in the response match the expected values from the database.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -469,7 +469,7 @@ def test_get_movie_by_id_fields_match_database(
     Test that the `/movies/{movie_id}` endpoint returns all fields matching the database data.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -544,7 +544,7 @@ def test_create_movie_and_related_models(client, db_session, jwt_manager):
     (genres, stars, directors) are created if they do not exist.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -639,7 +639,7 @@ def test_create_movie_duplicate_error(client, db_session, seed_database, jwt_man
     results in a 409 conflict error.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -689,7 +689,7 @@ def test_delete_movie_success_by_admin(client, db_session, seed_database, jwt_ma
     """
     group = db_session.query(UserGroupModel).filter_by(name=UserGroupEnum.ADMIN).first()
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=group.id
+        email="test@example.com", raw_password="TestPassword123!", group_id=group.id
     )
     user.is_active = True
     db_session.add(user)
@@ -722,7 +722,7 @@ def test_delete_movie_not_found(client, db_session, seed_database, jwt_manager):
     """
     group = db_session.query(UserGroupModel).filter_by(name=UserGroupEnum.ADMIN).first()
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=group.id
+        email="test@example.com", raw_password="TestPassword123!", group_id=group.id
     )
     user.is_active = True
     db_session.add(user)
@@ -758,7 +758,7 @@ def test_update_movie_success_by_moderator(
         db_session.query(UserGroupModel).filter_by(name=UserGroupEnum.MODERATOR).first()
     )
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=group.id
+        email="test@example.com", raw_password="TestPassword123!", group_id=group.id
     )
     user.is_active = True
     db_session.add(user)
@@ -808,7 +808,7 @@ def test_update_movie_not_found(client, seed_database, db_session, jwt_manager):
         db_session.query(UserGroupModel).filter_by(name=UserGroupEnum.MODERATOR).first()
     )
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=group.id
+        email="test@example.com", raw_password="TestPassword123!", group_id=group.id
     )
     user.is_active = True
     db_session.add(user)
@@ -843,7 +843,7 @@ def test_search_movies_by_genres_stars_directors(
 
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -1003,7 +1003,7 @@ def test_add_or_remove_movie_to_favorite(
     The endpoint returns a 404 error when a movie with the given ID does not exist.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -1082,7 +1082,7 @@ def test_adding_like_or_dislike_to_movie(
     Or remove like or dislike for this movie (remove_like_dislike = yes).
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -1178,7 +1178,7 @@ def test_can_to_rate_movie(client, db_session, jwt_manager, seed_database):
     Test that user can to rate movie from 1 to 10.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -1251,7 +1251,7 @@ def test_update_genres_of_movie_by_movie_id_allowed_only_admin_or_moderator(
 
     # authorized USER, group_id = 1
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -1277,7 +1277,7 @@ def test_update_genres_of_movie_by_movie_id(
     """
     # group_user != 1
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=2
+        email="test@example.com", raw_password="TestPassword123!", group_id=2
     )
     user.is_active = True
     db_session.add(user)
@@ -1322,7 +1322,7 @@ def test_update_directors_of_movie_by_movie_id(
     """
     # group_user != 1
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=2
+        email="test@example.com", raw_password="TestPassword123!", group_id=2
     )
     user.is_active = True
     db_session.add(user)
@@ -1369,7 +1369,7 @@ def test_update_stars_of_movie_by_movie_id(
     """
     # group_user != 1
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=2
+        email="test@example.com", raw_password="TestPassword123!", group_id=2
     )
     user.is_active = True
     db_session.add(user)
@@ -1424,7 +1424,7 @@ def test_adding_comments_to_unexisting_movie(
     Test that can not add comments to an unexisting movie.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -1450,7 +1450,7 @@ def test_adding_comments_to_movie_by_movie_id(
     Test that user can add comments to a movie by movie ID.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -1502,7 +1502,7 @@ def test_adding_empty_comments_to_movie_by_movie_id(
     Test that if user add empty comment to a movie by movie ID returns 400 error Bad Request.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -1532,7 +1532,7 @@ def test_get_list_comments_for_movie_by_movie_id(
     Test that list of comments for movie includes all comments of all users for this specific movie.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -1548,7 +1548,7 @@ def test_get_list_comments_for_movie_by_movie_id(
     )
 
     other_user = UserModel.create(
-        email="test_other@mate.com", raw_password="TestOtherPassword123!", group_id=2
+        email="test_other@example.com", raw_password="TestOtherPassword123!", group_id=2
     )
     other_user.is_active = True
     db_session.add(other_user)
@@ -1596,7 +1596,7 @@ def test_if_movie_does_not_have_any_comment(
     Test list comments, if a movie does not have any comments yet, it should return 404 Not Found.
     """
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -1637,7 +1637,7 @@ def test_user_can_put_likes_to_comments(client, db_session, jwt_manager, seed_da
     Test  that user can put likes any comments.
     """
     other_user = UserModel.create(
-        email="other_test@mate.com", raw_password="TestOtherPassword123!", group_id=1
+        email="other_test@example.com", raw_password="TestOtherPassword123!", group_id=1
     )
     other_user.is_active = True
     db_session.add(other_user)
@@ -1656,7 +1656,7 @@ def test_user_can_put_likes_to_comments(client, db_session, jwt_manager, seed_da
     )
 
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
@@ -1720,7 +1720,7 @@ def test_user_can_reply_for_comments(client, db_session, jwt_manager, seed_datab
     Test  that user can replay for any comments.
     """
     other_user = UserModel.create(
-        email="other_test@mate.com", raw_password="TestOtherPassword123!", group_id=1
+        email="other_test@example.com", raw_password="TestOtherPassword123!", group_id=1
     )
     other_user.is_active = True
     db_session.add(other_user)
@@ -1739,7 +1739,7 @@ def test_user_can_reply_for_comments(client, db_session, jwt_manager, seed_datab
     )
 
     user = UserModel.create(
-        email="test@mate.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com", raw_password="TestPassword123!", group_id=1
     )
     user.is_active = True
     db_session.add(user)
