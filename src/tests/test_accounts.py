@@ -1289,7 +1289,7 @@ def test_change_user_group_or_user_is_active_manually(
 
     payload = {"group": "admin"}
     response = client.patch(
-        f"/api/v1/accounts/update-user/999/",
+        "/api/v1/accounts/update-user/999/",
         headers={"Authorization": f"Bearer {access_token_admin}"},
         json=payload,
     )

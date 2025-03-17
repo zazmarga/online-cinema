@@ -153,7 +153,7 @@ def test_user_shopping_cart_when_it_is_empty(client, db_session, jwt_manager):
     access_token = jwt_manager.create_access_token({"user_id": user.id})
 
     response = client.get(
-        f"/api/v1/carts/user-cart/",
+        "/api/v1/carts/user-cart/",
         headers={"Authorization": f"Bearer {access_token}"},
     )
     # shopping cart is not existing
@@ -209,7 +209,7 @@ def test_get_user_shopping_cart_success(client, db_session, jwt_manager, seed_da
 
     #  get user's shopping cart with 2 random movies:
     response = client.get(
-        f"/api/v1/carts/user-cart/",
+        "/api/v1/carts/user-cart/",
         headers={"Authorization": f"Bearer {access_token}"},
     )
     assert (
@@ -357,9 +357,17 @@ def test_get_all_of_users_carts_allowed_only_admins(
     """
     Test that all users carts can see only admins.
     """
-    # group_id = 1 it is normal user
+    # normal user
+    user_group = (
+        db_session.query(UserGroupModel)
+        .filter(UserGroupModel.name == UserGroupEnum.USER)
+        .first()
+    )
+
     user = UserModel.create(
-        email="test@example.com", raw_password="TestPassword123!", group_id=1
+        email="test@example.com",
+        raw_password="TestPassword123!",
+        group_id=user_group.id,
     )
     user.is_active = True
     db_session.add(user)
