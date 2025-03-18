@@ -33,7 +33,11 @@ from src.database.session import get_db
 from src.exceptions.security import BaseSecurityError
 from src.notifications import EmailSenderInterface
 from src.schemas.accounts import MessageResponseSchema
-from src.schemas.payments import PaymentListSchema, PaymentItemListSchema, PaymentListFullSchema
+from src.schemas.payments import (
+    PaymentListSchema,
+    PaymentItemListSchema,
+    PaymentListFullSchema,
+)
 from src.security.http import get_token
 from src.security.interfaces import JWTAuthManagerInterface
 
@@ -81,6 +85,7 @@ async def confirm_order_and_create_checkout_session(
         .filter(OrderModel.id == order_id, OrderModel.user_id == user_id)
         .first()
     )
+
     if not order:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -89,7 +94,8 @@ async def confirm_order_and_create_checkout_session(
 
     if order.status == OrderStatusEnum.PAID or order.status == OrderStatusEnum.CANCELED:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Payment was paid or canceled."
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Payment was paid or canceled.",
         )
 
     #  Check prices of order_items (maybe its were changed)
@@ -158,17 +164,6 @@ async def stripe_webhook(
     stripe.api_key = settings.STRIPE_SECRET_KEY
     webhook_secret = settings.WEBHOOK_SECRET
 
-    # # check Signature
-    # try:
-    #     event = stripe.Webhook.construct_event(
-    #         payload, signature_header, webhook_secret
-    #     )
-    #     print("Webhook verified!")
-    # except stripe.error.SignatureVerificationError:
-    #     raise HTTPException(status_code=400, detail="Invalid signature")
-    # except ValueError as e:
-    #     print("Invalid payload")
-    #     raise HTTPException(status_code=400, detail="Invalid payload")
     try:
         # check Signature Webhook
         event = stripe.Webhook.construct_event(
@@ -176,10 +171,10 @@ async def stripe_webhook(
         )
         print("Webhook verified!")
 
-        if event['type'] == 'invoice.payment_failed':
+        if event["type"] == "invoice.payment_failed":
             # Payment failed
-            invoice = event['data']['object']
-            payment_intent = invoice.get('payment_intent')
+            invoice = event["data"]["object"]
+            payment_intent = invoice.get("payment_intent")
 
             if payment_intent:
                 try:
@@ -290,7 +285,9 @@ async def stripe_webhook(
         404: {
             "description": "Not found.",
             "content": {
-                "application/json": {"example": {"detail": "User's payments not found."}}
+                "application/json": {
+                    "example": {"detail": "User's payments not found."}
+                }
             },
         },
         500: {
@@ -335,7 +332,7 @@ def get_list_user_payments(
                 id=payment.id,
                 date=payment.created_at.strftime("%Y-%m-%d %H:%M"),
                 amount=payment.amount,
-                status=payment.status
+                status=payment.status,
             )
         )
 
@@ -347,10 +344,10 @@ def get_list_user_payments(
     response_model=List[PaymentListFullSchema],
     summary="Get list of all payments.",
     description="<h3>This endpoint shows list of all payments for all users. Allowed only for ADMIN users. </h3>"
-                "<p>Optional:  Filtering payments by user_id/list(user_id), ex.: 2,3; <br>"
-                "by start date (inclusive), ex.: YYYY-MM-DD; <br>"
-                "by end date (inclusive), ex.: YYYY-MM-DD; <br>"
-                "by status, ex.: successful  (should be one of: 'successful', 'refunded' or 'canceled').</p>",
+    "<p>Optional:  Filtering payments by user_id/list(user_id), ex.: 2,3; <br>"
+    "by start date (inclusive), ex.: YYYY-MM-DD; <br>"
+    "by end date (inclusive), ex.: YYYY-MM-DD; <br>"
+    "by status, ex.: successful  (should be one of: 'successful', 'refunded' or 'canceled').</p>",
     status_code=status.HTTP_200_OK,
     responses={
         401: {
@@ -416,7 +413,10 @@ def get_list_payments(
     user = db.query(UserModel).filter(UserModel.id == user_id).first()
 
     if not user.is_admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have permission to do this operation.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to do this operation.",
+        )
 
     query = db.query(PaymentModel)
 
