@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi_filter import FilterDepends
@@ -270,7 +270,7 @@ def cancel_order(
     token: str = Depends(get_token),
     db: Session = Depends(get_db),
     jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
-) -> MessageResponseSchema | None:
+) -> Union[None, MessageResponseSchema]:
     """
     Canceling user orders.
     This endpoint allows to cancel user order by order ID.

@@ -1,7 +1,6 @@
 import enum
 from datetime import datetime, timezone, timedelta
-from typing import List, Optional
-
+from typing import List, Optional, Union
 
 from sqlalchemy import (
     Integer,
@@ -107,7 +106,7 @@ class UserModel(Base):
 
     @classmethod
     def create(
-        cls, email: str, raw_password: str, group_id: int | Mapped[int]
+        cls, email: str, raw_password: str, group_id: Union[int, Mapped[int]]
     ) -> "UserModel":
         """
         Factory method to create a new UserModel instance.

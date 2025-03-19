@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import cast
+from typing import cast, Union
 
 from src.config.celery_app import celery_app
 from sqlalchemy.orm import Session
@@ -8,7 +8,7 @@ from src.database.session import SessionLocal
 
 
 @celery_app.task(name="delete_expired_activation_tokens")
-def delete_expired_activation_tokens() -> str | None:
+def delete_expired_activation_tokens() -> Union[str, None]:
     """Delete expired activation tokens"""
     print("TASK: Delete expired activation tokens")
     db: Session = SessionLocal()  # Open Session
