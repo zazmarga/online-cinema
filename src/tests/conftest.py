@@ -117,7 +117,7 @@ def seed_database(db_session, settings):
     from src.database.populate import CSVDatabaseSeeder
 
     seeder = CSVDatabaseSeeder(
-        csv_file_path=settings.PATH_TO_MOVIES_CSV, db_session=db_session
+        csv_file_path=settings.PATH_TO_TEST_MOVIES_CSV, db_session=db_session
     )
     if not seeder.is_db_populated():
         seeder.seed()

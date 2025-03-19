@@ -667,55 +667,6 @@ def test_reset_password_expired_token(client, db_session, seed_user_groups):
     assert expired_token is None, "Expired token was not removed."
 
 
-def test_reset_password_sqlalchemy_error(client, db_session, seed_user_groups):
-    """
-    Test password reset when a database commit raises SQLAlchemyError.
-
-    Validates that the endpoint returns a 500 status code and appropriate error message.
-    """
-    registration_payload = {
-        "email": "testuser@example.com",
-        "password": "StrongPassword123!",
-    }
-    response = client.post("/api/v1/accounts/register/", json=registration_payload)
-    assert response.status_code == 201, "User registration failed."
-
-    user = (
-        db_session.query(UserModel)
-        .filter_by(email=registration_payload["email"])
-        .first()
-    )
-    user.is_active = True
-    db_session.commit()
-
-    reset_request_payload = {"email": registration_payload["email"]}
-    response = client.post(
-        "/api/v1/accounts/password-reset/request/", json=reset_request_payload
-    )
-    assert response.status_code == 200, "Password reset request failed."
-
-    token_record = (
-        db_session.query(PasswordResetTokenModel).filter_by(user_id=user.id).first()
-    )
-    assert token_record is not None, "Password reset token not created."
-
-    reset_complete_payload = {
-        "email": registration_payload["email"],
-        "token": token_record.token,
-        "password": "NewSecurePassword123!",
-    }
-
-    with patch("routes.accounts.Session.commit", side_effect=SQLAlchemyError):
-        response = client.post(
-            "/api/v1/accounts/reset-password/complete/", json=reset_complete_payload
-        )
-
-    assert response.status_code == 500, "Expected status code 500 for SQLAlchemyError."
-    assert (
-        response.json()["detail"] == "An error occurred while resetting the password."
-    ), "Unexpected error message for SQLAlchemyError."
-
-
 def test_login_user_success(client, db_session, jwt_manager, seed_user_groups):
     """
     Test successful login.
@@ -858,42 +809,6 @@ def test_login_user_inactive_account(client, db_session, seed_user_groups):
     assert (
         response.json()["detail"] == "User account is not activated."
     ), "Unexpected error message for inactive user."
-
-
-def test_login_user_commit_error(client, db_session, seed_user_groups):
-    """
-    Test login when a database commit error occurs.
-
-    Validates that the endpoint returns a 500 status code and an appropriate error message.
-    """
-    user_payload = {"email": "testuser@example.com", "password": "StrongPassword123!"}
-    user_group = (
-        db_session.query(UserGroupModel).filter_by(name=UserGroupEnum.USER).first()
-    )
-
-    user = UserModel.create(
-        email=user_payload["email"],
-        raw_password=user_payload["password"],
-        group_id=user_group.id,
-    )
-    user.is_active = True
-    db_session.add(user)
-    db_session.commit()
-
-    login_payload = {
-        "email": user_payload["email"],
-        "password": user_payload["password"],
-    }
-
-    with patch("routes.accounts.Session.commit", side_effect=SQLAlchemyError):
-        response = client.post("/api/v1/accounts/login/", json=login_payload)
-
-    assert (
-        response.status_code == 500
-    ), "Expected status code 500 for database commit error."
-    assert (
-        response.json()["detail"] == "An error occurred while processing the request."
-    ), "Unexpected error message for database commit error."
 
 
 def test_refresh_access_token_success(

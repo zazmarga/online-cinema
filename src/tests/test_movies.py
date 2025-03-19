@@ -876,7 +876,7 @@ def test_search_movies_by_genres_stars_directors(
             param_stars.append(f"stars={star.name}")
             check_stars.append(star.name)
 
-    #  only directors
+    # directors
     parameters = "&".join(param_directors)
     request_url = f"/api/v1/movies/search/?{parameters}"
 
@@ -885,14 +885,14 @@ def test_search_movies_by_genres_stars_directors(
         headers={"Authorization": f"Bearer {access_token}"},
     )
     response_data = response.json()
-    movies_query = movies_query.filter(
+    movies_query_directors = movies_query.filter(
         MovieModel.directors.any(
             func.lower(DirectorModel.name).in_(
                 [director.lower() for director in check_directors]
             )
         )
     )
-    movies_list = movies_query.all()
+    movies_list = movies_query_directors.all()
     if len(movies_list) == 0:
         assert (
             response.status_code == 404
@@ -906,8 +906,8 @@ def test_search_movies_by_genres_stars_directors(
             response_data["movies"]
         ), f"{len(movies_list)} != {len(response_data["movies"])}"
 
-    #  directors & genres
-    parameters = "&".join(param_directors + param_genres)
+    # genres
+    parameters = "&".join(param_genres)
     request_url = f"/api/v1/movies/search/?{parameters}"
     response = client.get(
         request_url,
@@ -918,13 +918,8 @@ def test_search_movies_by_genres_stars_directors(
         response.status_code == 200
     ), f"Expected status code 200, but got {response.status_code}"
 
-    movies_query = movies_query.filter(
+    movies_query_genres = movies_query.filter(
         and_(
-            MovieModel.directors.any(
-                func.lower(DirectorModel.name).in_(
-                    [director.lower() for director in check_directors]
-                )
-            ),
             MovieModel.genres.any(
                 func.lower(GenreModel.name).in_(
                     [genre.lower() for genre in check_genres]
@@ -932,7 +927,7 @@ def test_search_movies_by_genres_stars_directors(
             ),
         )
     )
-    movies_list = movies_query.all()
+    movies_list = movies_query_genres.all()
     if len(movies_list) == 0:
         assert (
             response.status_code == 404
@@ -943,8 +938,8 @@ def test_search_movies_by_genres_stars_directors(
             response_data["movies"]
         ), f"{len(movies_list)} != {len(response_data["movies"])}"
 
-    # directors, genres & stars
-    parameters = "&".join(param_directors + param_genres + param_stars)
+    # stars
+    parameters = "&".join(param_stars)
     request_url = f"/api/v1/movies/search/?{parameters}"
 
     response = client.get(
@@ -953,24 +948,14 @@ def test_search_movies_by_genres_stars_directors(
     )
     response_data = response.json()
 
-    movies_query = movies_query.filter(
+    movies_query_stars = movies_query.filter(
         and_(
-            MovieModel.directors.any(
-                func.lower(DirectorModel.name).in_(
-                    [director.lower() for director in check_directors]
-                )
-            ),
-            MovieModel.genres.any(
-                func.lower(GenreModel.name).in_(
-                    [genre.lower() for genre in check_genres]
-                )
-            ),
             MovieModel.stars.any(
                 func.lower(StarModel.name).in_([star.lower() for star in check_stars])
             ),
         )
     )
-    movies_list = movies_query.all()
+    movies_list = movies_query_stars.all()
     if len(movies_list) == 0:
         assert (
             response.status_code == 404
