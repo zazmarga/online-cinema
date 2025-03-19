@@ -40,11 +40,8 @@ class CSVDatabaseSeeder:
             print("User groups seeded successfully.")
 
     def _preprocess_csv(self):
-        data = pd.read_csv(
-            self._csv_file_path, delimiter=";"
-        )  #  quoting=csv.QUOTE_NONE
-        # print(data.columns)
-        # print(data.head())
+        data = pd.read_csv(self._csv_file_path, delimiter=";")
+
         data = data.drop_duplicates(subset=["names", "year", "time"], keep="first")
 
         data["stars"] = data["stars"].fillna("Unknown")
@@ -54,8 +51,8 @@ class CSVDatabaseSeeder:
                 ",".join(sorted(set(stars.split(",")))) if stars != "Unknown" else stars
             )
         )
-        data["genre"] = data["genre"].fillna("Unknown")
-        data["genre"] = data["genre"].str.replace("\u00a0", "", regex=True)
+        data["genres"] = data["genres"].fillna("Unknown")
+        data["genres"] = data["genres"].str.replace("\u00a0", "", regex=True)
 
         print("Preprocessing csv file")
 
@@ -102,7 +99,7 @@ class CSVDatabaseSeeder:
             certifications = data["certification"].unique()
             genres = set(
                 genre.strip()
-                for genres in data["genre"].dropna()
+                for genres in data["genres"].dropna()
                 for genre in genres.split(",")
                 if genre.strip()
             )
@@ -167,7 +164,7 @@ class CSVDatabaseSeeder:
             ):
                 movie_id = movie_ids[i]
 
-                for genre_name in row["genre"].split(","):
+                for genre_name in row["genres"].split(","):
                     if genre_name.strip():
                         genre = genre_map[genre_name.strip()]
                         movie_genres_data.append(

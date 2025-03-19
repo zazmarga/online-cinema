@@ -15,7 +15,7 @@ from fastapi_filter import FilterDepends
 from sqlalchemy import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
-from sqlalchemy.testing.pickleable import User
+
 
 from src.config.settings import BaseAppSettings
 from src.config.dependencies import (

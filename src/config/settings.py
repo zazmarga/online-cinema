@@ -8,7 +8,12 @@ from pathlib import Path
 class BaseAppSettings(BaseSettings):
     BASE_DIR: Path = Path(__file__).parent.parent
     PATH_TO_DB: str = str(BASE_DIR / "database" / "source" / "cinema.db")
-    PATH_TO_MOVIES_CSV: str = str(BASE_DIR / "database" / "seed_data" / "test_data.csv")
+    PATH_TO_DATA_MOVIES_CSV: str = str(
+        BASE_DIR / "database" / "seed_data" / "movies.csv"
+    )
+    PATH_TO_TEST_MOVIES_CSV: str = str(
+        BASE_DIR / "database" / "seed_data" / "test_data.csv"
+    )
 
     PATH_TO_EMAIL_TEMPLATES_DIR: str = str(BASE_DIR / "notifications" / "templates")
     ACTIVATION_EMAIL_TEMPLATE_NAME: str = "activation_request.html"
@@ -33,16 +38,16 @@ class BaseAppSettings(BaseSettings):
 
     STRIPE_SECRET_KEY: str = os.getenv(
         "STRIPE_SECRET_KEY",
-        "sk_test",
+        "<your sk_test_..>",
     )
     STRIPE_PUBLISHABLE_KEY: str = os.getenv(
         "STRIPE_PUBLISHABLE_KEY",
-        "pk_test",
+        "<your pk_test_..>",
     )
     BASE_URL: str = os.getenv("BASE_URL", "http://127.0.0.1:4242")
     WEBHOOK_SECRET: str = os.getenv(
         "WEBHOOK_SECRET",
-        "whsec",
+        "<your whsec_..>",
     )
 
     S3_STORAGE_HOST: str = os.getenv("MINIO_HOST", "127.0.0.1")

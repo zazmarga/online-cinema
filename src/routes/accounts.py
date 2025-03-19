@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from os.path import exists
 from typing import cast
 
 from fastapi import APIRouter, status, BackgroundTasks, Depends, HTTPException
@@ -52,7 +51,7 @@ router = APIRouter()
     "/register/",
     response_model=UserRegistrationResponseSchema,
     summary="User Registration",
-    description="Register a new user with an email and password.",
+    description="Register a new user with an email and password. The first registration will be created Admin user (!!)",
     status_code=status.HTTP_201_CREATED,
     responses={
         409: {
@@ -97,7 +96,6 @@ def register_user(
 
     user_group = db.query(UserGroupModel).filter_by(name=UserGroupEnum.USER).first()
 
-    # if first time choose user_group
     if not user_group:
         groups = [{"name": group.value} for group in UserGroupEnum]
         db.execute(insert(UserGroupModel).values(groups))
