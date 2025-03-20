@@ -904,7 +904,7 @@ def test_search_movies_by_genres_stars_directors(
         ), f"Expected status code 200, but got {response.status_code}"
         assert len(movies_list) == len(
             response_data["movies"]
-        ), f"{len(movies_list)} != {len(response_data["movies"])}"
+        ), f"{len(movies_list)} != {len(response_data['movies'])}"
 
     # genres
     parameters = "&".join(param_genres)
@@ -936,7 +936,7 @@ def test_search_movies_by_genres_stars_directors(
     else:
         assert len(movies_list) == len(
             response_data["movies"]
-        ), f"{len(movies_list)} != {len(response_data["movies"])}"
+        ), f"{len(movies_list)} != {len(response_data['movies'])}"
 
     # stars
     parameters = "&".join(param_stars)
@@ -968,7 +968,7 @@ def test_search_movies_by_genres_stars_directors(
 
         assert len(movies_list) == len(
             response_data["movies"]
-        ), f"{len(movies_list)} != {len(response_data["movies"])}"
+        ), f"{len(movies_list)} != {len(response_data['movies'])}"
 
         response_movie_ids = [movie["movie"]["id"] for movie in response_data["movies"]]
         if len(movies_list) > 0:
@@ -1024,7 +1024,7 @@ def test_add_or_remove_movie_to_favorite(
     ), f"Expected status code 200, but got {response.status_code}"
     assert (
         response_data["is_favorite"] == True
-    ), f"Expected that is_favorite is True, but {response_data["is_favorite"]} got."
+    ), f"Expected that is_favorite is True, but {response_data['is_favorite']} got."
     exist_movie_in_favorite = (
         db_session.query(FavoriteMovieModel)
         .filter(
@@ -1047,7 +1047,7 @@ def test_add_or_remove_movie_to_favorite(
     ), f"Expected status code 200, but got {response.status_code}"
     assert (
         response_data["is_favorite"] == False
-    ), f"Expected that is_favorite is False, but {response_data["is_favorite"]} got."
+    ), f"Expected that is_favorite is False, but {response_data['is_favorite']} got."
     exist_movie_in_favorite = (
         db_session.query(FavoriteMovieModel)
         .filter(
@@ -1088,7 +1088,7 @@ def test_adding_like_or_dislike_to_movie(
     response_data = response.json()
     assert (
         response_data["is_liked"] == True
-    ), f"Expected that is_liked is True, but {response_data["is_liked"]} got."
+    ), f"Expected that is_liked is True, but {response_data['is_liked']} got."
     exist_movie_in_likes_dislikes = (
         db_session.query(LikeMovieModel)
         .filter(
@@ -1116,7 +1116,7 @@ def test_adding_like_or_dislike_to_movie(
     response_data = response.json()
     assert (
         response_data["is_liked"] == False
-    ), f"Expected that is_liked is False, but {response_data["is_liked"]} got."
+    ), f"Expected that is_liked is False, but {response_data['is_liked']} got."
     exist_movie_in_likes_dislikes = (
         db_session.query(LikeMovieModel)
         .filter(
@@ -1144,7 +1144,7 @@ def test_adding_like_or_dislike_to_movie(
     response_data = response.json()
     assert (
         response_data["remove_like_dislike"] == "yes"
-    ), f"Expected that remove_like_dislike is 'yes', but {response_data["remove_like_dislike"]} got."
+    ), f"Expected that remove_like_dislike is 'yes', but {response_data['remove_like_dislike']} got."
     exist_movie_in_likes_dislikes = (
         db_session.query(LikeMovieModel)
         .filter(
@@ -1194,7 +1194,7 @@ def test_can_to_rate_movie(client, db_session, jwt_manager, seed_database):
     response_data = response.json()
     assert (
         response_data["to_rate"] == to_rate
-    ), f"Expected that to_rate is {to_rate}, but {response_data["to_rate"]} got."
+    ), f"Expected that to_rate is {to_rate}, but {response_data['to_rate']} got."
 
     exist_movie_rating = (
         db_session.query(RatingMovieModel)

@@ -7,8 +7,12 @@ services:
       - "8000:8000"
       - "4242:4242"  # for webhook
     env_file:
-      - .env  # environment variables
-    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8000 --host 0.0.0.0 --port 4242
+      - .env
+    command: >
+      sh -c "
+        uvicorn src.main:app --reload --host 0.0.0.0 --port 8000 & 
+        uvicorn src.main:app --host 0.0.0.0 --port 4242 --workers 1 --log-level info
+      "
     volumes:
       - .:/app
     depends_on:
@@ -23,8 +27,8 @@ services:
     image: mailhog/mailhog
     container_name: mailhog
     ports:
-      - "1025:1025"   # SMTP server
-      - "8025:8025"   # web
+      - "1025:1025"
+      - "8025:8025"
     env_file:
       - .env
     networks:
@@ -32,33 +36,37 @@ services:
 
   # MinIO server (storage)
   minio:
-    image: minio/minio
+    image: minio/minio:latest
     container_name: minio-cinema
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server --console-address ":9001" /data
     ports:
       - "9000:9000"
-    command: server /data
+      - "9001:9001"
+    env_file:
+      - .env
     volumes:
-      - minio-data:/data
+      - minio_data:/data
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
-      - online_cinema_net
+     - online_cinema_net
 
-  # mc_setup (for MinIO setup)
-  mc_setup:
-    image: minio/mc
-    container_name: minio-mc-setup
-    environment:
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
-    command: >
-      mc alias set minio http://${MINIO_HOST}:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} && 
-      mc mb minio/cinema-storage
-    networks:
-      - online_cinema_net
+ # mc_setup (for MinIO setup)
+  minio_mc:
+    build:
+      context: .
+      dockerfile: docker/minio_mc/Dockerfile
+    container_name: minio-cinema-mc
     depends_on:
-      - minio
+      minio:
+        condition: service_healthy
+    env_file:
+      - .env
+    networks:
+     - online_cinema_net
 
   # Redis server (for Celery)
   redis:
@@ -110,5 +118,6 @@ networks:
     driver: bridge
 
 volumes:
-  minio-data:
+  minio_data:
+    driver: local
 

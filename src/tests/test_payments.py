@@ -444,5 +444,5 @@ def test_admin_can_get_list_of_all_users_payments(
     assert len(response_data) == 1, "Expected 1 item, got {}".format(len(response_data))
     assert (
         response_data[0]["status"] == status
-    ), f"Expected status must be 'canceled', got {response_data[0]["status"]}."
+    ), f"Expected status must be 'canceled', got {response_data[0]['status']}."
     assert response_data[0]["user_id"] == user2.id, f"Expected user_id = {user2.id}."
