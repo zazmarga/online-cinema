@@ -1,0 +1,123 @@
+services:
+  # FastAPI server (Online Cinema)
+  online_cinema:
+    build: .
+    container_name: online_cinema
+    ports:
+      - "8000:8000"
+      - "4242:4242"  # for webhook
+    env_file:
+      - .env
+    command: >
+      sh -c "
+        uvicorn src.main:app --reload --host 0.0.0.0 --port 8000 & 
+        uvicorn src.main:app --host 0.0.0.0 --port 4242 --workers 1 --log-level info
+      "
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - mailhog_cinema
+      - minio
+    networks:
+      - online_cinema_net
+
+  # MailHog (for test sent email)
+  mailhog_cinema:
+    image: mailhog/mailhog
+    container_name: mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    env_file:
+      - .env
+    networks:
+      - online_cinema_net
+
+  # MinIO server (storage)
+  minio:
+    image: minio/minio:latest
+    container_name: minio-cinema
+    command: server --console-address ":9001" /data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    env_file:
+      - .env
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+     - online_cinema_net
+
+ # mc_setup (for MinIO setup)
+  minio_mc:
+    build:
+      context: .
+      dockerfile: docker/minio_mc/Dockerfile
+    container_name: minio-cinema-mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    env_file:
+      - .env
+    networks:
+     - online_cinema_net
+
+  # Redis server (for Celery)
+  redis:
+    image: redis:7.4.2
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - online_cinema_net
+
+  # Celery Worker (for task)
+  celery_worker:
+    build: .
+    container_name: celery_worker
+    command: celery -A src.config.celery_app worker --loglevel=info --pool=solo
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - online_cinema
+    networks:
+      - online_cinema_net
+
+  # Celery Beat (for schedule task)
+  celery_beat:
+    build: .
+    container_name: celery_beat
+    command: celery -A src.config.celery_app beat --loglevel=info
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - online_cinema
+    networks:
+      - online_cinema_net
+
+  # Stripe CLI
+  stripe_cli:
+    image: stripe/stripe-cli
+    container_name: stripe_cli
+    environment:
+      - STRIPE_API_KEY=${STRIPE_SECRET_KEY}
+    networks:
+      - online_cinema_net
+    command: ["listen", "--forward-to", "http://host.docker.internal:4242/api/v1/payments/webhook/"]  # Перенаправление на вебхук на том же сервере
+
+networks:
+  online_cinema_net:
+    driver: bridge
+
+volumes:
+  minio_data:
+    driver: local
+
